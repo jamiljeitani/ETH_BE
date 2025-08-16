@@ -2,7 +2,7 @@
 const cfg = require('../config/env');
 
 function verifyEmailTemplate({ token }) {
-  const link = `${cfg.baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  const link = `${cfg.baseUrl}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`;
   return {
     subject: 'Verify your email',
     html: `<p>Welcome!</p><p>Please verify your email by clicking <a href="${link}">this link</a>.</p>

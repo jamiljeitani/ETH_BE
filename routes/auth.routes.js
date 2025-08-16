@@ -6,7 +6,7 @@ const { validate } = require('../middlewares/validate.middleware');
 const { authGuard } = require('../middlewares/auth.middleware');
 
 router.post('/signup', validate(schema.signup), ctrl.signup);
-router.post('/verify-email', validate(schema.verifyEmail), ctrl.verifyEmail);
+router.get('/verify-email', validate(schema.verifyEmail), ctrl.verifyEmail);
 router.post('/login', validate(schema.login), ctrl.login);
 router.post('/refresh', validate(schema.refresh), ctrl.refresh);
 router.post('/forgot', validate(schema.forgot), ctrl.forgot);

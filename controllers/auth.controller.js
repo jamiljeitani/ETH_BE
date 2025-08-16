@@ -10,7 +10,8 @@ async function signup(req, res, next) {
 
 async function verifyEmail(req, res, next) {
   try {
-    const user = await authService.verifyEmail(req.body);
+    const { token } = req.query;
+    const user = await authService.verifyEmail({ token });
     res.json({ user, message: 'Email verified.' });
   } catch (e) { next(e); }
 }
