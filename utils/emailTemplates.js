@@ -11,7 +11,7 @@ function verifyEmailTemplate({ token }) {
 }
 
 function resetPasswordTemplate({ token }) {
-  const link = `${cfg.baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+  const link = `${cfg.frontendURL}/reset?token=${encodeURIComponent(token)}`;
   return {
     subject: 'Reset your password',
     html: `<p>You requested a password reset.</p><p>Reset via <a href="${link}">this link</a>.</p>
