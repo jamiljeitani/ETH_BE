@@ -62,7 +62,6 @@ async function createPurchase(studentId, payload) {
       status: 'pending', amount, currency
     }, { transaction: t });
 
-    // return with optional included references
     return Purchase.findByPk(purchase.id, {
       include: [
         { model: Bundle, as: 'bundle', include: [{ model: BundleItem, as: 'items', include: [{ model: SessionType, as: 'sessionType' }] }] },

@@ -11,4 +11,9 @@ const confirmPayment = Joi.object({
   currency: Joi.string().trim().max(10).optional()
 });
 
-module.exports = { idParam, confirmPayment };
+// Stripe checkout creation
+const stripeCheckout = Joi.object({
+  purchaseId: Joi.string().uuid().required()
+});
+
+module.exports = { idParam, confirmPayment, stripeCheckout };

@@ -9,13 +9,25 @@ const routes = require('./routes');
 const { notFound } = require('./middlewares/notFound.middleware');
 const { errorHandler } = require('./middlewares/error.middleware');
 
+// ⚠️ Controller import for direct webhook mount
+const { stripeWebhook } = require('./controllers/payments.controller');
+
 const app = express();
 
 app.use(helmet());
 app.use(cors());
+app.use(morgan('dev'));
+
+// Stripe webhook needs the raw body, so mount this BEFORE express.json()
+app.post(
+  '/api/v1/payments/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  stripeWebhook
+);
+
+// Regular parsers for everything else
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
 
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 

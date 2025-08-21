@@ -24,5 +24,9 @@ async function sendVerifyEmail(to, subject, html) {
 async function sendResetEmail(to, subject, html) {
   return safeSend(to, subject, html);
 }
+// Generic export for any other mail (purchase confirmations, etc.)
+async function sendGenericEmail(to, subject, html) {
+  return safeSend(to, subject, html);
+}
 
-module.exports = { sendVerifyEmail, sendResetEmail };
+module.exports = { sendVerifyEmail, sendResetEmail, sendGenericEmail };

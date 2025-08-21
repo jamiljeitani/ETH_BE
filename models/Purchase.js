@@ -5,10 +5,9 @@ module.exports = (sequelize, DataTypes) => {
 
     studentId: { type: DataTypes.UUID, allowNull: false }, // -> users.id
     bundleId: { type: DataTypes.UUID, allowNull: true },   // -> bundles.id
-    sessionTypeId: { type: DataTypes.UUID, allowNull: true }, // -> session_types.id (for custom hours)
+    sessionTypeId: { type: DataTypes.UUID, allowNull: true }, // -> session_types.id
 
     hoursPurchased: { type: DataTypes.INTEGER, allowNull: false },
-    // hoursConsumed will be handled in Phase 7 via Consumptions; keep a cached number if you want:
     hoursConsumed: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 
     startDate: { type: DataTypes.DATE, allowNull: false },

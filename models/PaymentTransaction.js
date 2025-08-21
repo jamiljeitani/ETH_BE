@@ -6,9 +6,11 @@ module.exports = (sequelize, DataTypes) => {
     purchaseId: { type: DataTypes.UUID, allowNull: false },
 
     method: {
-      type: DataTypes.ENUM('visa', 'mastercard', 'omt', 'whish', 'suyool', 'wu'),
+      // + stripe
+      type: DataTypes.ENUM('visa', 'mastercard', 'omt', 'whish', 'suyool', 'wu', 'stripe'),
       allowNull: false
     },
+
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     currency: { type: DataTypes.STRING, allowNull: false, defaultValue: 'USD' },
 
@@ -17,12 +19,23 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'pending'
     },
+
     reference: { type: DataTypes.STRING, allowNull: true },
-    receiptUrl: { type: DataTypes.STRING, allowNull: true }, // for offline uploads
+    receiptUrl: { type: DataTypes.STRING, allowNull: true },
+
+    // Stripe-specific
+    stripeSessionId: { type: DataTypes.STRING, allowNull: true },
+    stripePaymentIntentId: { type: DataTypes.STRING, allowNull: true },
+
     processedAt: { type: DataTypes.DATE, allowNull: true }
   }, {
     tableName: 'payment_transactions',
-    indexes: [{ fields: ['purchaseId'] }, { fields: ['method'] }, { fields: ['status'] }]
+    indexes: [
+      { fields: ['purchaseId'] },
+      { fields: ['method'] },
+      { fields: ['status'] },
+      { fields: ['stripeSessionId'] }
+    ]
   });
 
   return PaymentTransaction;

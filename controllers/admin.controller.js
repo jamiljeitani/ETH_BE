@@ -95,6 +95,45 @@ const reportPayouts = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+// GET /api/v1/admin/users?role=student|tutor|admin (role optional)
+exports.listUsers = async (req, res, next) => {
+  try {
+    const { role } = req.query;
+    const where = {};
+    if (role) where.role = role; // IMPORTANT: don't Object.assign with a non-object
+
+    const users = await User.findAll({
+      where,
+      attributes: ["id", "email", "role", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/admin/students/:id/purchases
+exports.listStudentPurchases = async (req, res, next) => {
+  try {
+    const { id: studentId } = req.params;
+
+    const purchases = await Purchase.findAll({
+      where: { studentId },
+      include: [
+        { model: SessionType, as: "sessionType", attributes: ["id", "name", "hourlyRate"] },
+        { model: Bundle, as: "bundle", attributes: ["id", "name", "price"] },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({ purchases });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   listLanguages, createLanguage, updateLanguage, deleteLanguage,
   listSubjects, createSubject, updateSubject, deleteSubject,
