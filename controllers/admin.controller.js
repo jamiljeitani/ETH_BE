@@ -5,6 +5,8 @@ const changeSvc = require('../services/change-request.service');
 const feedbackSvc = require('../services/feedback.service');
 const reportsSvc = require('../services/reports.service');
 
+const { User, Purchase, SessionType, Bundle } = require('../models');
+
 // Languages
 const listLanguages = (req, res, next) => admin.language.list().then(d => res.json(d)).catch(next);
 const createLanguage = (req, res, next) => admin.language.create(req.body).then(d => res.status(201).json(d)).catch(next);
@@ -96,7 +98,7 @@ const reportPayouts = async (req, res, next) => {
 };
 
 // GET /api/v1/admin/users?role=student|tutor|admin (role optional)
-exports.listUsers = async (req, res, next) => {
+const listUsers = async (req, res, next) => {
   try {
     const { role } = req.query;
     const where = {};
@@ -115,7 +117,7 @@ exports.listUsers = async (req, res, next) => {
 };
 
 // GET /api/v1/admin/students/:id/purchases
-exports.listStudentPurchases = async (req, res, next) => {
+const listStudentPurchases = async (req, res, next) => {
   try {
     const { id: studentId } = req.params;
 
@@ -123,7 +125,7 @@ exports.listStudentPurchases = async (req, res, next) => {
       where: { studentId },
       include: [
         { model: SessionType, as: "sessionType", attributes: ["id", "name", "hourlyRate"] },
-        { model: Bundle, as: "bundle", attributes: ["id", "name", "price"] },
+        { model: Bundle, as: "bundle", attributes: ["id", "name"] },
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -148,5 +150,7 @@ module.exports = {
   decideChangeRequest,
   listFeedback,
   reportConsumption,
-  reportPayouts
+  reportPayouts,
+  listUsers,
+  listStudentPurchases,
 };

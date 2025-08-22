@@ -150,7 +150,7 @@ router.get('/students/:id/purchases',
 );
 
 // ---------- Assignments ----------
-router.get('/assignments', ensureCtrl('getAssignments'));
+router.get('/assignments', ensureCtrl('listAssignments'));
 router.post('/assignments',
   safeValidate(adminSchema.createAssignment),
   ensureCtrl('createAssignment')
