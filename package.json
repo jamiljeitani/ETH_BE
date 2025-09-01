@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed:admin": "node scripts/seed-admin.js"
+    "seed:admin": "node scripts/seed-admin.js",
+    "seed:languages": "node scripts/seed-languages.js",
+    "seed:pref-language": "node scripts/add-preferred-language-migration.js"
   },
   "keywords": [],
   "author": "",
