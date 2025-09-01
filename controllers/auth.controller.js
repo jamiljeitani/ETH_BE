@@ -44,8 +44,33 @@ async function reset(req, res, next) {
   } catch (e) { next(e); }
 }
 
-async function me(req, res) {
-  res.json({ user: req.user });
+async function me(req, res, next) {
+  try {
+    const user = await authService.getUserById(req.user.id);
+    // Prevent caching to ensure fresh user data
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.json({ user });
+  } catch (e) { next(e); }
 }
 
-module.exports = { signup, verifyEmail, login, refresh, forgot, reset, me };
+async function updatePreferences(req, res, next) {
+  try {
+    const user = await authService.updateUserPreferences(req.user.id, req.body);
+    // Prevent caching to ensure fresh data
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.json({ user, message: 'Preferences updated successfully.' });
+  } catch (e) { next(e); }
+}
+
+async function getPreferences(req, res, next) {
+  try {
+    const preferences = await authService.getUserPreferences(req.user.id);
+    res.json({ preferences });
+  } catch (e) { next(e); }
+}
+
+module.exports = { signup, verifyEmail, login, refresh, forgot, reset, me, updatePreferences, getPreferences };
