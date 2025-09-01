@@ -12,7 +12,5 @@ router.post('/refresh', validate(schema.refresh), ctrl.refresh);
 router.post('/forgot', validate(schema.forgot), ctrl.forgot);
 router.post('/reset', validate(schema.reset), ctrl.reset);
 router.get('/me', authGuard, ctrl.me);
-router.get('/preferences', authGuard, ctrl.getPreferences);
-router.put('/preferences', authGuard, validate(schema.updatePreferences), ctrl.updatePreferences);
 
 module.exports = router;

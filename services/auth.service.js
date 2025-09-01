@@ -17,7 +17,6 @@ function sanitizeUser(u) {
     role: u.role,
     status: u.status,
     emailVerifiedAt: u.emailVerifiedAt,
-    preferredLanguage: u.preferredLanguage || 'en',
     createdAt: u.createdAt
   };
 }
@@ -129,27 +128,4 @@ async function resetPassword({ token, newPassword }) {
   return sanitizeUser(user);
 }
 
-async function updateUserPreferences(userId, preferences) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
-
-  await user.update(preferences);
-  return sanitizeUser(user);
-}
-
-async function getUserPreferences(userId) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
-
-  return {
-    preferredLanguage: user.preferredLanguage || 'en'
-  };
-}
-
-async function getUserById(userId) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
-  return sanitizeUser(user);
-}
-
-module.exports = { signup, verifyEmail, login, refresh, forgotPassword, resetPassword, updateUserPreferences, getUserPreferences, getUserById };
+module.exports = { signup, verifyEmail, login, refresh, forgotPassword, resetPassword };

@@ -33,8 +33,4 @@ const refresh = Joi.object({
   refreshToken: Joi.string().min(10).required()
 });
 
-const updatePreferences = Joi.object({
-  preferredLanguage: Joi.string().valid('en', 'fr', 'ar').required()
-});
-
-module.exports = { signup, login, verifyEmail, forgot, reset, refresh, updatePreferences };
+module.exports = { signup, login, verifyEmail, forgot, reset, refresh };

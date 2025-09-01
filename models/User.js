@@ -6,8 +6,7 @@ module.exports = (sequelize, DataTypes) => {
     passwordHash: { type: DataTypes.STRING, allowNull: false },
     role: { type: DataTypes.ENUM('admin', 'student', 'tutor'), allowNull: false, defaultValue: 'student' },
     status: { type: DataTypes.ENUM('active', 'disabled'), allowNull: false, defaultValue: 'active' },
-    emailVerifiedAt: { type: DataTypes.DATE, allowNull: true },
-    preferredLanguage: { type: DataTypes.STRING, allowNull: true, defaultValue: 'en' }
+    emailVerifiedAt: { type: DataTypes.DATE, allowNull: true }
   }, {
     tableName: 'users',
     indexes: [{ fields: ['email'], unique: true }]
