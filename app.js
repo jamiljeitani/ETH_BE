@@ -29,6 +29,9 @@ app.post(
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 
 // health (root)

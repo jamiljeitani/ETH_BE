@@ -1,5 +1,7 @@
 // controllers/tutors.controller.js
 const svc = require('../services/tutor.service');
+const path = require('path');
+const fs = require('fs').promises;
 
 async function getMe(req, res, next) {
   try {
@@ -15,4 +17,56 @@ async function putMe(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { getMe, putMe };
+async function uploadAvatar(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: { message: 'No file uploaded' } });
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const profile = await tutorSvc.updateAvatar(req.user.id, avatarUrl);
+
+    res.json({
+      profile,
+      avatarUrl,
+      message: 'Avatar uploaded successfully'
+    });
+  } catch (e) {
+    if (req.file) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.error('Failed to clean up uploaded file:', unlinkError);
+      }
+    }
+    next(e);
+  }
+}
+
+async function uploadIdDocument(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: { message: 'No file uploaded' } });
+    }
+
+    const documentUrl = `/uploads/documents/${req.file.filename}`;
+    const profile = await tutorSvc.updateIdDocument(req.user.id, documentUrl);
+
+    res.json({
+      profile,
+      documentUrl,
+      message: 'ID document uploaded successfully'
+    });
+  } catch (e) {
+    if (req.file) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.error('Failed to clean up uploaded file:', unlinkError);
+      }
+    }
+    next(e);
+  }
+}
+
+module.exports = { getMe, putMe, uploadAvatar, uploadIdDocument };
