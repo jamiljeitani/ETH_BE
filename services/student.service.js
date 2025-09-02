@@ -60,4 +60,24 @@ async function upsertMe(userId, payload) {
   });
 }
 
-module.exports = { getMe, upsertMe };
+async function updateAvatar(userId, avatarUrl) {
+  const user = await User.findByPk(userId);
+  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
+
+  // Update or create student profile with avatar URL
+  const [profile] = await StudentProfile.findOrCreate({
+    where: { userId },
+    defaults: { userId, pictureUrl: avatarUrl }
+  });
+
+  if (profile.pictureUrl !== avatarUrl) {
+    await profile.update({ pictureUrl: avatarUrl });
+  }
+
+  // Also update the user's main profile picture URL for navbar display
+  await user.update({ profilePictureUrl: avatarUrl });
+
+  return getMe(userId);
+}
+
+module.exports = { getMe, upsertMe, updateAvatar };
