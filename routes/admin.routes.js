@@ -165,4 +165,9 @@ router.delete('/assignments/:id',
   ensureCtrl('deleteAssignment')
 );
 
+// ---------- Dashboard ----------
+router.get('/dashboard/stats', ensureCtrl('getDashboardStats'));
+router.get('/dashboard/recent-students', ensureCtrl('getRecentStudents'));
+router.get('/dashboard/recent-tutors', ensureCtrl('getRecentTutors'));
+
 module.exports = router;

@@ -1,5 +1,5 @@
 // services/assignment.service.js
-const { sequelize, User, Purchase, Assignment } = require('../models');
+const { sequelize, User, Purchase, Assignment, StudentProfile, TutorProfile, SessionType, Bundle } = require('../models');
 const { assignmentStudentEmail, assignmentTutorEmail } = require('../utils/emailTemplates');
 const { sendVerifyEmail } = require('./email.service');
 
@@ -41,15 +41,69 @@ async function listAssignments(filters = {}) {
   if (filters.tutorId) where.tutorId = filters.tutorId;
   if (filters.purchaseId) where.purchaseId = filters.purchaseId;
 
-  return Assignment.findAll({
+  const assignments = await Assignment.findAll({
     where,
     order: [['createdAt', 'DESC']],
     include: [
-      { association: 'student', attributes: ['id', 'email', 'role'] },
-      { association: 'tutor', attributes: ['id', 'email', 'role'] },
-      { association: 'purchase' }
+      {
+        association: 'student',
+        attributes: ['id', 'email', 'role'],
+        include: [{
+          model: StudentProfile,
+          as: 'studentProfile',
+          attributes: ['fullName', 'school'],
+          required: false
+        }]
+      },
+      {
+        association: 'tutor',
+        attributes: ['id', 'email', 'role'],
+        include: [{
+          model: TutorProfile,
+          as: 'tutorProfile',
+          attributes: ['fullName', 'educationLevel'],
+          required: false
+        }]
+      },
+      {
+        association: 'purchase',
+        include: [
+          { model: SessionType, as: "sessionType", attributes: ["name", "hourlyRate"] },
+          { model: Bundle, as: "bundle", attributes: ["name"] }
+        ]
+      }
     ]
   });
+
+  // Format assignments with better display data
+  return assignments.map(assignment => ({
+    id: assignment.id,
+    studentId: assignment.studentId,
+    tutorId: assignment.tutorId,
+    purchaseId: assignment.purchaseId,
+    createdAt: assignment.createdAt,
+    notes: assignment.notes,
+    student: {
+      id: assignment.student?.id,
+      email: assignment.student?.email,
+      displayName: assignment.student?.studentProfile?.fullName || assignment.student?.email,
+      school: assignment.student?.studentProfile?.school
+    },
+    tutor: {
+      id: assignment.tutor?.id,
+      email: assignment.tutor?.email,
+      displayName: assignment.tutor?.tutorProfile?.fullName || assignment.tutor?.email,
+      education: assignment.tutor?.tutorProfile?.educationLevel
+    },
+    purchase: {
+      id: assignment.purchase?.id,
+      hours: assignment.purchase?.hours,
+      status: assignment.purchase?.status,
+      displayName: assignment.purchase?.bundleId
+        ? `${assignment.purchase?.bundle?.name || 'Bundle'} (${assignment.purchase?.hours}h)`
+        : `${assignment.purchase?.sessionType?.name || 'Session'} (${assignment.purchase?.hours}h)`
+    }
+  }));
 }
 
 module.exports = { createOrReplaceAssignment, listAssignments };
