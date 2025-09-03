@@ -5,7 +5,7 @@ const changeSvc = require('../services/change-request.service');
 const feedbackSvc = require('../services/feedback.service');
 const reportsSvc = require('../services/reports.service');
 
-const { User, Purchase, SessionType, Bundle } = require('../models');
+const { User, Purchase, SessionType, Bundle, StudentProfile, TutorProfile, BacType, Subject } = require('../models');
 
 // Languages
 const listLanguages = (req, res, next) => admin.language.list().then(d => res.json(d)).catch(next);
@@ -102,15 +102,47 @@ const listUsers = async (req, res, next) => {
   try {
     const { role } = req.query;
     const where = {};
-    if (role) where.role = role; // IMPORTANT: don't Object.assign with a non-object
+    if (role) where.role = role;
 
     const users = await User.findAll({
       where,
       attributes: ["id", "email", "role", "createdAt"],
+      include: [
+        {
+          model: StudentProfile,
+          as: 'studentProfile',
+          attributes: ['fullName', 'guardianName', 'school'],
+          required: false
+        },
+        {
+          model: TutorProfile,
+          as: 'tutorProfile',
+          attributes: ['fullName', 'educationLevel'],
+          required: false
+        }
+      ],
       order: [["createdAt", "DESC"]],
     });
 
-    res.json({ users });
+    // Format users with display names
+    const formattedUsers = users.map(user => ({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      displayName: user.role === 'student'
+        ? (user.studentProfile?.fullName || user.email)
+        : user.role === 'tutor'
+        ? (user.tutorProfile?.fullName || user.email)
+        : user.email,
+      profileInfo: user.role === 'student'
+        ? user.studentProfile?.school
+        : user.role === 'tutor'
+        ? user.tutorProfile?.educationLevel
+        : null
+    }));
+
+    res.json({ users: formattedUsers });
   } catch (err) {
     next(err);
   }
@@ -136,6 +168,138 @@ const listStudentPurchases = async (req, res, next) => {
   }
 };
 
+// GET /api/v1/admin/dashboard/stats
+const getDashboardStats = async (req, res, next) => {
+  try {
+    const { Op } = require('sequelize');
+    const now = new Date();
+    const twentyDaysAgo = new Date(now.getTime() - (20 * 24 * 60 * 60 * 1000));
+
+    // Get total counts
+    const totalStudents = await User.count({ where: { role: 'student' } });
+    const totalTutors = await User.count({ where: { role: 'tutor' } });
+    const totalSessions = await SessionType.count();
+
+    // Get new registrations in last 20 days
+    const newStudents = await User.count({
+      where: {
+        role: 'student',
+        createdAt: { [Op.gte]: twentyDaysAgo }
+      }
+    });
+
+    const newTutors = await User.count({
+      where: {
+        role: 'tutor',
+        createdAt: { [Op.gte]: twentyDaysAgo }
+      }
+    });
+
+    // Calculate percentage increases (mock calculation for now)
+    const studentIncrease = totalStudents > 0 ? Math.round((newStudents / totalStudents) * 100) : 0;
+    const tutorIncrease = totalTutors > 0 ? Math.round((newTutors / totalTutors) * 100) : 0;
+
+    res.json({
+      stats: {
+        totalStudents,
+        totalTutors,
+        totalSessions,
+        newStudents,
+        newTutors,
+        studentIncrease,
+        tutorIncrease,
+        sessionIncrease: 60 // Mock value for now
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/admin/dashboard/recent-students
+const getRecentStudents = async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+
+    const students = await User.findAll({
+      where: { role: 'student' },
+      include: [{
+        model: StudentProfile,
+        as: 'studentProfile',
+        attributes: ['fullName', 'guardianName', 'school'],
+        include: [{
+          model: BacType,
+          as: 'bacTypes',
+          attributes: ['name'],
+          through: { attributes: [] }
+        }]
+      }],
+      attributes: ['id', 'email', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit
+    });
+
+    const formattedStudents = students.map((student, index) => ({
+      no: String(index + 1).padStart(2, '0'),
+      name: student.studentProfile?.fullName || student.email,
+      guardian: student.studentProfile?.guardianName || 'N/A',
+      date: student.createdAt.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }),
+      bac: student.studentProfile?.bacTypes?.[0]?.name || 'N/A',
+      id: student.id
+    }));
+
+    res.json({ students: formattedStudents });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/admin/dashboard/recent-tutors
+const getRecentTutors = async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+
+    const tutors = await User.findAll({
+      where: { role: 'tutor' },
+      include: [{
+        model: TutorProfile,
+        as: 'tutorProfile',
+        attributes: ['fullName', 'educationLevel'],
+        include: [{
+          model: Subject,
+          as: 'subjects',
+          attributes: ['name'],
+          through: { attributes: [] }
+        }]
+      }],
+      attributes: ['id', 'email', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit
+    });
+
+    const formattedTutors = tutors.map((tutor, index) => ({
+      no: String(index + 1).padStart(2, '0'),
+      name: tutor.tutorProfile?.fullName || tutor.email,
+      teach: tutor.tutorProfile?.subjects?.map(s => s.name).join(', ') || 'N/A',
+      date: tutor.createdAt.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }),
+      cert: tutor.tutorProfile?.educationLevel || 'N/A',
+      id: tutor.id
+    }));
+
+    res.json({ tutors: formattedTutors });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   listLanguages, createLanguage, updateLanguage, deleteLanguage,
   listSubjects, createSubject, updateSubject, deleteSubject,
@@ -153,4 +317,8 @@ module.exports = {
   reportPayouts,
   listUsers,
   listStudentPurchases,
+  // Dashboard endpoints
+  getDashboardStats,
+  getRecentStudents,
+  getRecentTutors,
 };
