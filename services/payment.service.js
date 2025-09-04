@@ -21,7 +21,7 @@ const {
 const { sendGenericEmail } = require('./email.service');
 
 // Offline/card (sim) sets
-const OFFLINE_METHODS = new Set(['omt', 'whish', 'suyool', 'wu']);
+const OFFLINE_METHODS = new Set(['omt', 'whish', 'suyool', 'wu', 'wired_transfer']);
 const CARD_METHODS = new Set(['visa', 'mastercard']);
 
 /**
@@ -31,8 +31,8 @@ function describePurchaseForStripe(purchase) {
   if (purchase.bundle) {
     const name = `Bundle: ${purchase.bundle.name}`;
     const desc = (purchase.bundle.items || [])
-      .map(it => `${it.hours}h ${it.sessionType?.name || 'Session'}`)
-      .join(' + ');
+        .map(it => `${it.hours}h ${it.sessionType?.name || 'Session'}`)
+        .join(' + ');
     return { name, description: desc || 'Tutoring bundle' };
   }
   if (purchase.sessionType) {
@@ -99,7 +99,7 @@ async function createStripeCheckout(userId, purchaseId) {
     status: 'pending',
     reference: null,
     receiptUrl: null,
-    stripeSessionId: session.id
+    stripeSessionId: session.id,
   });
 
   return { url: session.url, sessionId: session.id, transactionId: tx.id };
@@ -142,16 +142,13 @@ async function handleStripeWebhook(req) {
           stripePaymentIntentId: paymentIntentId || null
         }, { transaction: t });
 
-        const purchase = await Purchase.findByPk(tx.purchaseId, {
-          include: [{ association: 'student' }],
-          transaction: t,
-          lock: t.LOCK.UPDATE
-        });
+        // Lock base row only, then reload with include (avoid FOR UPDATE on outer join)
+        const purchase = await Purchase.findByPk(tx.purchaseId, { transaction: t, lock: t.LOCK.UPDATE });
         if (purchase && purchase.status === 'pending') {
           await purchase.update({ status: 'active' }, { transaction: t });
 
-          // email student
-          const mail = require('../utils/emailTemplates').purchaseConfirmationEmail({ purchase });
+          await purchase.reload({ include: [{ association: 'student' }], transaction: t });
+          const mail = purchaseConfirmationEmail({ purchase });
           await sendGenericEmail(purchase.student.email, mail.subject, mail.html);
         }
       });
@@ -179,21 +176,32 @@ async function handleStripeWebhook(req) {
 
 /**
  * Existing confirmPayment for non-Stripe methods (dev sims/offline).
+ * Adds payerPhone (OMT/Whish/Suyool/WU) and iban (wired_transfer).
  */
-async function confirmPayment(studentId, purchaseId, { method, reference, receiptUrl, amount, currency }) {
+async function confirmPayment(
+    studentId,
+    purchaseId,
+    { method, reference, receiptUrl, amount, currency, payerPhone, iban }
+) {
   return sequelize.transaction(async (t) => {
+    // 1) Lock base row only (no includes)
     const purchase = await Purchase.findByPk(purchaseId, {
-      include: [
-        { model: Bundle, as: 'bundle', include: [{ model: BundleItem, as: 'items', include: [{ model: SessionType, as: 'sessionType' }] }] },
-        { model: SessionType, as: 'sessionType' },
-        { association: 'student' }
-      ],
       transaction: t,
       lock: t.LOCK.UPDATE
     });
     if (!purchase || purchase.studentId !== studentId) {
       const e = new Error('Purchase not found'); e.status = 404; throw e;
     }
+
+    // 2) Reload with includes (do NOT lock here)
+    await purchase.reload({
+      include: [
+        { model: Bundle, as: 'bundle', include: [{ model: BundleItem, as: 'items', include: [{ model: SessionType, as: 'sessionType' }] }] },
+        { model: SessionType, as: 'sessionType' },
+        { association: 'student' }
+      ],
+      transaction: t
+    });
 
     const tx = await PaymentTransaction.create({
       purchaseId,
@@ -202,14 +210,18 @@ async function confirmPayment(studentId, purchaseId, { method, reference, receip
       currency: currency ?? purchase.currency,
       status: 'pending',
       reference: reference || null,
-      receiptUrl: receiptUrl || null
+      receiptUrl: receiptUrl || null,
+      // NEW fields
+      payerPhone: payerPhone || null,
+      iban: iban || null
     }, { transaction: t });
 
     if (CARD_METHODS.has(method)) {
       await tx.update({ status: 'succeeded', processedAt: new Date() }, { transaction: t });
       await purchase.update({ status: 'active' }, { transaction: t });
 
-      const mail = require('../utils/emailTemplates').purchaseConfirmationEmail({ purchase });
+      await purchase.reload({ include: [{ association: 'student' }], transaction: t });
+      const mail = purchaseConfirmationEmail({ purchase });
       await sendGenericEmail(purchase.student.email, mail.subject, mail.html);
 
       return { purchase, transaction: tx };
@@ -219,7 +231,8 @@ async function confirmPayment(studentId, purchaseId, { method, reference, receip
       await tx.update({ status: 'manual_review', processedAt: new Date() }, { transaction: t });
       await purchase.update({ status: 'pending_review' }, { transaction: t });
 
-      const mail = require('../utils/emailTemplates').pendingReviewEmail({ purchase });
+      await purchase.reload({ include: [{ association: 'student' }], transaction: t });
+      const mail = pendingReviewEmail({ purchase });
       await sendGenericEmail(purchase.student.email, mail.subject, mail.html);
 
       return { purchase, transaction: tx };
@@ -230,10 +243,96 @@ async function confirmPayment(studentId, purchaseId, { method, reference, receip
   });
 }
 
+/**
+ * List transactions pending manual review (admin).
+ */
+async function listManualReviewTransactions({ page = 1, limit = 20 }) {
+  const offset = (Number(page) - 1) * Number(limit);
+  const where = { status: 'manual_review' };
+  const { rows, count } = await PaymentTransaction.findAndCountAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    offset,
+    limit: Number(limit),
+    include: [
+      { model: Purchase, as: 'purchase', include: [{ model: User, as: 'student' }] }
+    ]
+  });
+  return { items: rows, total: count, page: Number(page), pages: Math.ceil(count / Number(limit)) };
+}
+
+/**
+ * Approve a manual payment transaction (admin).
+ * - Marks tx as succeeded
+ * - Activates purchase
+ * - Sends confirmation email
+ */
+async function approveManualTransaction(adminId, transactionId, { note } = {}) {
+  return sequelize.transaction(async (t) => {
+    const tx = await PaymentTransaction.findByPk(transactionId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!tx) { const e = new Error('Transaction not found'); e.status = 404; throw e; }
+    if (tx.status !== 'manual_review') { const e = new Error('Transaction not in manual review'); e.status = 409; throw e; }
+
+    await tx.update({ status: 'succeeded', processedAt: new Date() }, { transaction: t });
+
+    // Lock base row first, then reload with include
+    const purchase = await Purchase.findByPk(tx.purchaseId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!purchase) { const e = new Error('Purchase not found'); e.status = 404; throw e; }
+
+    await purchase.update({ status: 'active' }, { transaction: t });
+
+    await purchase.reload({ include: [{ association: 'student' }], transaction: t });
+    const mail = purchaseConfirmationEmail({ purchase });
+    await sendGenericEmail(purchase.student.email, mail.subject, mail.html);
+
+    return { purchase, transaction: tx, message: 'Payment approved and purchase activated.' };
+  });
+}
+
+/**
+ * Reject a manual payment transaction (admin).
+ * - Marks tx as failed
+ * - Cancels purchase
+ * - Optionally could email student
+ */
+async function rejectManualTransaction(adminId, transactionId, { note } = {}) {
+  return sequelize.transaction(async (t) => {
+    const tx = await PaymentTransaction.findByPk(transactionId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!tx) { const e = new Error('Transaction not found'); e.status = 404; throw e; }
+    if (tx.status !== 'manual_review') { const e = new Error('Transaction not in manual review'); e.status = 409; throw e; }
+
+    await tx.update({ status: 'failed', processedAt: new Date() }, { transaction: t });
+
+    // Lock base row first, then reload with include
+    const purchase = await Purchase.findByPk(tx.purchaseId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!purchase) { const e = new Error('Purchase not found'); e.status = 404; throw e; }
+
+    await purchase.update({ status: 'cancelled' }, { transaction: t });
+
+    try {
+      await purchase.reload({ include: [{ association: 'student' }], transaction: t });
+      const { sendGenericEmail } = require('./email.service');
+      await sendGenericEmail(
+          purchase.student.email,
+          'Payment was rejected',
+          `<p>Your payment was rejected.${note ? ' Note: ' + String(note) : ''}</p>`
+      );
+    } catch {
+      // ignore email failure
+    }
+
+    return { purchase, transaction: tx, message: 'Payment rejected and purchase cancelled.' };
+  });
+}
+
 module.exports = {
   // Stripe
   createStripeCheckout,
   handleStripeWebhook,
   // Existing (non-Stripe)
-  confirmPayment
+  confirmPayment,
+  // Admin
+  listManualReviewTransactions,
+  approveManualTransaction,
+  rejectManualTransaction
 };

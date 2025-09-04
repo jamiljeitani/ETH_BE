@@ -5,6 +5,34 @@ const changeSvc = require('../services/change-request.service');
 const feedbackSvc = require('../services/feedback.service');
 const reportsSvc = require('../services/reports.service');
 
+// ---- Manual payments (admin) ----
+const paymentSvc = require('../services/payment.service');
+
+async function listManualPayments(req, res, next) {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const result = await paymentSvc.listManualReviewTransactions({ page, limit });
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+async function approveManualPayment(req, res, next) {
+  try {
+    const { transactionId } = req.params;
+    const result = await paymentSvc.approveManualTransaction(req.user.id, transactionId, req.body);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+async function rejectManualPayment(req, res, next) {
+  try {
+    const { transactionId } = req.params;
+    const result = await paymentSvc.rejectManualTransaction(req.user.id, transactionId, req.body);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+
 const { User, Purchase, SessionType, Bundle, StudentProfile, TutorProfile, BacType, Subject } = require('../models');
 
 // Languages
@@ -321,4 +349,7 @@ module.exports = {
   getDashboardStats,
   getRecentStudents,
   getRecentTutors,
+  listManualPayments,
+  approveManualPayment,
+  rejectManualPayment
 };

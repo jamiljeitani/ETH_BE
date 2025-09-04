@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
 
     method: {
       // + stripe
-      type: DataTypes.ENUM('visa', 'mastercard', 'omt', 'whish', 'suyool', 'wu', 'stripe'),
+      type: DataTypes.ENUM('visa', 'mastercard', 'omt', 'whish', 'suyool', 'wu', 'stripe', 'wired_transfer'),
       allowNull: false
     },
 
@@ -26,6 +26,9 @@ module.exports = (sequelize, DataTypes) => {
     // Stripe-specific
     stripeSessionId: { type: DataTypes.STRING, allowNull: true },
     stripePaymentIntentId: { type: DataTypes.STRING, allowNull: true },
+
+    payerPhone: { type: DataTypes.STRING, allowNull: true }, // for omt/whish/suyool/wu
+    iban: { type: DataTypes.STRING, allowNull: true },
 
     processedAt: { type: DataTypes.DATE, allowNull: true }
   }, {
