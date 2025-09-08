@@ -1,194 +1,188 @@
 // routes/admin.routes.js
-const router = require('express').Router();
+const router = require("express").Router();
 
-const ctrl = require('../controllers/admin.controller');
-const { validate } = require('../middlewares/validate.middleware');
-const { authMiddleware } = require('../middlewares/auth.middleware');
-const { requireRole } = require('../middlewares/role.middleware');
+const ctrl = require("../controllers/admin.controller");
+const { validate } = require("../middlewares/validate.middleware");
+const { authMiddleware } = require("../middlewares/auth.middleware");
+const { requireRole } = require("../middlewares/role.middleware");
 
-// Defensive schema loads (they might not export everything yet)
+// Defensive schema loads (optional)
 let adminSchema = {};
 let reportSchema = {};
-try { adminSchema = require('../validators/admin.schema'); } catch { adminSchema = {}; }
-try { reportSchema = require('../validators/reports.schema'); } catch { reportSchema = {}; }
+let paymentSchema = {};
+try { adminSchema = require("../validators/admin.schema"); } catch { /* noop */ }
+try { reportSchema = require("../validators/reports.schema"); } catch { /* noop */ }
+try { paymentSchema = require("../validators/payment.schema"); } catch { /* noop */ }
 
 // No-op validator if schema is missing
-const safeValidate = (schema, location = 'body') =>
+const safeValidate = (schema, location = "body") =>
   schema ? validate(schema, location) : (req, res, next) => next();
 
-// Ensure a controller exists; otherwise return 501 (prevents Express crash)
+// Ensure a controller exists; otherwise return 501
 const ensureCtrl = (name) =>
-  (typeof ctrl?.[name] === 'function')
+  (typeof ctrl?.[name] === "function")
     ? ctrl[name]
     : (req, res) => res.status(501).json({
-        error: { code: 'NOT_IMPLEMENTED', message: `Admin controller '${name}' not implemented` }
+        error: { code: "NOT_IMPLEMENTED", message: `Admin controller '${name}' not implemented` }
       });
 
 // Protect ALL admin routes
-router.use(authMiddleware, requireRole('admin'));
+router.use(authMiddleware, requireRole("admin"));
 
-// ---------- Languages ----------
-router.get('/languages', ensureCtrl('listLanguages'));
-router.post('/languages', safeValidate(adminSchema.createLanguage), ensureCtrl('createLanguage'));
-router.put('/languages/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Languages ---------- */
+router.get("/languages", ensureCtrl("listLanguages"));
+router.post("/languages", safeValidate(adminSchema.createLanguage), ensureCtrl("createLanguage"));
+router.put("/languages/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateLanguage),
-  ensureCtrl('updateLanguage')
+  ensureCtrl("updateLanguage")
 );
-router.delete('/languages/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteLanguage')
+router.delete("/languages/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteLanguage")
 );
 
-// ---------- Subjects ----------
-router.get('/subjects', ensureCtrl('listSubjects'));
-router.post('/subjects', safeValidate(adminSchema.createSubject), ensureCtrl('createSubject'));
-router.put('/subjects/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Subjects ---------- */
+router.get("/subjects", ensureCtrl("listSubjects"));
+router.post("/subjects", safeValidate(adminSchema.createSubject), ensureCtrl("createSubject"));
+router.put("/subjects/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateSubject),
-  ensureCtrl('updateSubject')
+  ensureCtrl("updateSubject")
 );
-router.delete('/subjects/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteSubject')
+router.delete("/subjects/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteSubject")
 );
 
-// ---------- Grades ----------
-router.get('/grades', ensureCtrl('listGrades'));
-router.post('/grades', safeValidate(adminSchema.createGrade), ensureCtrl('createGrade'));
-router.put('/grades/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Grades ---------- */
+router.get("/grades", ensureCtrl("listGrades"));
+router.post("/grades", safeValidate(adminSchema.createGrade), ensureCtrl("createGrade"));
+router.put("/grades/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateGrade),
-  ensureCtrl('updateGrade')
+  ensureCtrl("updateGrade")
 );
-router.delete('/grades/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteGrade')
+router.delete("/grades/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteGrade")
 );
 
-// ---------- Bac Types ----------
-router.get('/bac-types', ensureCtrl('listBacTypes'));
-router.post('/bac-types', safeValidate(adminSchema.createBacType), ensureCtrl('createBacType'));
-router.put('/bac-types/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Bac Types ---------- */
+router.get("/bac-types", ensureCtrl("listBacTypes"));
+router.post("/bac-types", safeValidate(adminSchema.createBacType), ensureCtrl("createBacType"));
+router.put("/bac-types/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateBacType),
-  ensureCtrl('updateBacType')
+  ensureCtrl("updateBacType")
 );
-router.delete('/bac-types/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteBacType')
+router.delete("/bac-types/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteBacType")
 );
 
-// ---------- Tutor Ranks ----------
-router.get('/tutor-ranks', ensureCtrl('listTutorRanks'));
-router.post('/tutor-ranks', safeValidate(adminSchema.createTutorRank), ensureCtrl('createTutorRank'));
-router.put('/tutor-ranks/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Tutor Ranks ---------- */
+router.get("/tutor-ranks", ensureCtrl("listTutorRanks"));
+router.post("/tutor-ranks", safeValidate(adminSchema.createTutorRank), ensureCtrl("createTutorRank"));
+router.put("/tutor-ranks/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateTutorRank),
-  ensureCtrl('updateTutorRank')
+  ensureCtrl("updateTutorRank")
 );
-router.delete('/tutor-ranks/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteTutorRank')
+router.delete("/tutor-ranks/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteTutorRank")
 );
 
-// ---------- Sessions (SessionType) ----------
-router.get('/sessions', ensureCtrl('listSessions'));
-router.post('/sessions', safeValidate(adminSchema.createSessionType), ensureCtrl('createSession'));
-router.put('/sessions/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Sessions (SessionType) ---------- */
+router.get("/sessions", ensureCtrl("listSessions"));
+router.get("/sessions/count", ensureCtrl("countSessions")); // NEW
+router.post("/sessions", safeValidate(adminSchema.createSessionType), ensureCtrl("createSession"));
+router.put("/sessions/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateSessionType),
-  ensureCtrl('updateSession')
+  ensureCtrl("updateSession")
 );
-router.delete('/sessions/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteSession')
+router.delete("/sessions/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteSession")
 );
 
-// ---------- Bundles ----------
-router.get('/bundles', ensureCtrl('listBundles'));
-router.post('/bundles', safeValidate(adminSchema.createBundle), ensureCtrl('createBundle'));
-router.put('/bundles/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Bundles ---------- */
+router.get("/bundles", ensureCtrl("listBundles"));
+router.post("/bundles", safeValidate(adminSchema.createBundle), ensureCtrl("createBundle"));
+router.put("/bundles/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateBundle),
-  ensureCtrl('updateBundle')
+  ensureCtrl("updateBundle")
 );
-router.delete('/bundles/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteBundle')
+router.delete("/bundles/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteBundle")
 );
 
-// ---------- Tutor change requests ----------
-router.get('/tutor-change-requests', ensureCtrl('listChangeRequests'));
-router.patch('/tutor-change-requests/:id',
-  safeValidate(adminSchema.idParam, 'params'),
+/* ---------- Tutor change requests ---------- */
+router.get("/tutor-change-requests", ensureCtrl("listChangeRequests"));
+router.patch("/tutor-change-requests/:id",
+  safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.decisionChangeRequest),
-  ensureCtrl('decideChangeRequest')
+  ensureCtrl("decideChangeRequest")
 );
 
-// ---------- Feedback (admin-only) ----------
-router.get('/feedback',
-  safeValidate(adminSchema.feedbackListQuery, 'query'),
-  ensureCtrl('listFeedback')
+/* ---------- Feedback (admin-only) ---------- */
+router.get("/feedback",
+  safeValidate(adminSchema.feedbackListQuery, "query"),
+  ensureCtrl("listFeedback")
 );
 
-
-
-// ---------- Payments (manual review) ----------
-const paymentSchema = require('../validators/payment.schema');
-
-router.get('/payments',
-  safeValidate(paymentSchema.adminListQuery, 'query'),
-  ensureCtrl('listManualPayments')
+/* ---------- Manual Payments ---------- */
+router.get("/payments",
+  safeValidate(paymentSchema?.adminListQuery, "query"),
+  ensureCtrl("listManualPayments")
+);
+router.patch("/payments/:transactionId/approve",
+  safeValidate(paymentSchema?.adminDecisionParams, "params"),
+  safeValidate(paymentSchema?.adminDecisionBody, "body"),
+  ensureCtrl("approveManualPayment")
+);
+router.patch("/payments/:transactionId/reject",
+  safeValidate(paymentSchema?.adminDecisionParams, "params"),
+  safeValidate(paymentSchema?.adminDecisionBody, "body"),
+  ensureCtrl("rejectManualPayment")
 );
 
-router.patch('/payments/:transactionId/approve',
-  safeValidate(paymentSchema.adminDecisionParams, 'params'),
-  safeValidate(paymentSchema.adminDecisionBody, 'body'),
-  ensureCtrl('approveManualPayment')
+/* ---------- Reports ---------- */
+router.get("/reports/consumption",
+  safeValidate(reportSchema.consumptionQuery, "query"),
+  ensureCtrl("reportConsumption")
+);
+router.get("/reports/payouts",
+  safeValidate(reportSchema.payoutsQuery, "query"),
+  ensureCtrl("reportPayouts")
 );
 
-router.patch('/payments/:transactionId/reject',
-  safeValidate(paymentSchema.adminDecisionParams, 'params'),
-  safeValidate(paymentSchema.adminDecisionBody, 'body'),
-  ensureCtrl('rejectManualPayment')
-);
-// ---------- Reports ----------
-router.get('/reports/consumption',
-  safeValidate(reportSchema.consumptionQuery, 'query'),
-  ensureCtrl('reportConsumption')
-);
-router.get('/reports/payouts',
-  safeValidate(reportSchema.payoutsQuery, 'query'),
-  ensureCtrl('reportPayouts')
+/* ---------- Users & Purchases (Assignments support) ---------- */
+router.get("/users", ensureCtrl("listUsers"));
+router.get("/users/count", ensureCtrl("countUsers")); // NEW
+
+router.get("/students/:id/purchases",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("listStudentPurchases")
 );
 
-// ---------- Users & Purchases (Assignments screen support) ----------
-router.get('/users', ensureCtrl('listUsers'));
-router.get('/students/:id/purchases',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('listStudentPurchases')
+/* ---------- Generic Users (Dashboard actions) ---------- */
+router.patch("/users/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("updateUser")
+);
+router.delete("/users/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteUser")
 );
 
-// ---------- Assignments ----------
-router.get('/assignments', ensureCtrl('listAssignments'));
-router.post('/assignments',
-  safeValidate(adminSchema.createAssignment),
-  ensureCtrl('createAssignment')
-);
-router.put('/assignments/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  safeValidate(adminSchema.updateAssignment),
-  ensureCtrl('updateAssignment')
-);
-router.delete('/assignments/:id',
-  safeValidate(adminSchema.idParam, 'params'),
-  ensureCtrl('deleteAssignment')
-);
-
-// ---------- Dashboard ----------
-router.get('/dashboard/stats', ensureCtrl('getDashboardStats'));
-router.get('/dashboard/recent-students', ensureCtrl('getRecentStudents'));
-router.get('/dashboard/recent-tutors', ensureCtrl('getRecentTutors'));
+/* ---------- Dashboard ---------- */
+router.get("/dashboard/stats", ensureCtrl("getDashboardStats"));
+router.get("/dashboard/recent-students", ensureCtrl("getRecentStudents"));
+router.get("/dashboard/recent-tutors", ensureCtrl("getRecentTutors"));
 
 module.exports = router;
