@@ -185,4 +185,7 @@ router.get("/dashboard/stats", ensureCtrl("getDashboardStats"));
 router.get("/dashboard/recent-students", ensureCtrl("getRecentStudents"));
 router.get("/dashboard/recent-tutors", ensureCtrl("getRecentTutors"));
 
+router.get('/tutor-ranks/usage', ensureCtrl('getTutorRankUsage'));
+router.patch('/tutors/:id/rank', ensureCtrl('assignTutorRank'));
+
 module.exports = router;

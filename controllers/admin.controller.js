@@ -178,33 +178,37 @@ const listUsers = async (req, res, next) => {
       where,
       attributes: ["id", "email", "role", "createdAt"],
       include: [
-        { model: StudentProfile, as: "studentProfile", attributes: ["fullName", "guardianName", "school"], required: false },
-        { model: TutorProfile, as: "tutorProfile", attributes: ["fullName", "educationLevel"], required: false },
+        { model: StudentProfile, as: "studentProfile", required: false }, // all fields
+        { model: TutorProfile, as: "tutorProfile", required: false },     // all fields
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    const formattedUsers = users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      displayName:
-        user.role === "student"
-          ? (user.studentProfile?.fullName || user.email)
-          : user.role === "tutor"
-          ? (user.tutorProfile?.fullName || user.email)
-          : user.email,
-      profileInfo:
-        user.role === "student"
-          ? user.studentProfile?.school
-          : user.role === "tutor"
-          ? user.tutorProfile?.educationLevel
-          : null,
-    }));
+    // Preserve full nested objects, then add computed fields
+    const formattedUsers = users.map((u) => {
+      const p = u.get({ plain: true }); // or u.toJSON()
+
+      const displayName =
+          p.role === "student"
+              ? (p.studentProfile?.fullName || p.email)
+              : p.role === "tutor"
+                  ? (p.tutorProfile?.fullName || p.email)
+                  : p.email;
+
+      const profileInfo =
+          p.role === "student"
+              ? p.studentProfile?.school
+              : p.role === "tutor"
+                  ? p.tutorProfile?.educationLevel
+                  : null;
+
+      return { ...p, displayName, profileInfo };
+    });
 
     res.json({ users: formattedUsers });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 const listStudentPurchases = async (req, res, next) => {
@@ -406,6 +410,26 @@ const deleteUser = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+const getTutorRankUsage = async (req, res, next) => {
+  try {
+    const ranks = await TutorRank.findAll({ order: [['name','ASC']] });
+    const profiles = await TutorProfile.findAll({ attributes: ['rankId'] });
+    const map = profiles.reduce((m, p) => { m[p.rankId] = (m[p.rankId]||0)+1; return m; }, {});
+    res.json(ranks.map(r => ({ id: r.id, name: r.name, count: map[r.id] || 0 })));
+  } catch (e) { next(e); }
+};
+
+const assignTutorRank = async (req, res, next) => {
+  try {
+    const { id } = req.params; // tutor userId
+    const { rankId } = req.body;
+    const profile = await TutorProfile.findOne({ where: { userId: id } });
+    if (!profile) { const e = new Error('Tutor profile not found'); e.status = 404; throw e; }
+    await profile.update({ rankId });
+    res.json({ updated: true });
+  } catch (e) { next(e); }
+};
+
 /* -----------------------
    Legacy specific update/delete (still exported)
 ------------------------ */
@@ -447,4 +471,6 @@ module.exports = {
 
   // legacy aliases
   updateStudent, deleteStudent, updateTutor, deleteTutor,
+
+  getTutorRankUsage, assignTutorRank,
 };
