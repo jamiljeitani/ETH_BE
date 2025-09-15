@@ -18,18 +18,32 @@ const { sendVerifyEmail } = require("./email.service");
  * Create or replace an assignment for a given purchase.
  * One assignment per purchase is enforced.
  */
-async function createOrReplaceAssignment(adminId, { studentId, tutorId, purchaseId, notes }) {
+async function createOrReplaceAssignment(
+    adminId,
+    { studentId, tutorId, purchaseId, notes }
+) {
   return sequelize.transaction(async (t) => {
-    const [student, tutor, purchase] = await Promise.all([
+    // 1) Lock the Purchase row and fetch with INNER JOIN on student
+    //    This avoids the "FOR UPDATE on nullable side of OUTER JOIN" error.
+    const purchase = await Purchase.findOne({
+      where: { id: purchaseId },
+      include: [
+        {
+          association: 'student',
+          required: true,
+        },
+      ],
+      transaction: t,
+      lock: { level: t.LOCK.UPDATE, of: Purchase }, // lock ONLY Purchase table
+    });
+
+    // 2) Fetch users (no lock needed)
+    const [student, tutor] = await Promise.all([
       User.findByPk(studentId, { transaction: t }),
       User.findByPk(tutorId, { transaction: t }),
-      Purchase.findByPk(purchaseId, {
-        include: [{ association: 'student' }],
-        transaction: t,
-        lock: t.LOCK.UPDATE,
-      }),
     ]);
 
+    // 3) Validations
     if (!student || student.role !== 'student') {
       const e = new Error('Invalid studentId'); e.status = 400; throw e;
     }
@@ -43,38 +57,64 @@ async function createOrReplaceAssignment(adminId, { studentId, tutorId, purchase
       const e = new Error('Purchase must be active'); e.status = 400; throw e;
     }
 
-    // Upsert one-per-purchase
-    let assignment = await Assignment.findOne({ where: { purchaseId }, transaction: t });
+    // 4) Ensure one assignment per purchaseId.
+    //    Prefer unique index on assignments(purchase_id). Handle race with retry.
+    let assignment = await Assignment.findOne({
+      where: { purchaseId },
+      transaction: t,
+      lock: t.LOCK.UPDATE, // lock row if it exists
+    });
+
+    const payload = {
+      studentId,
+      tutorId,
+      purchaseId,
+      assignedBy: adminId,
+      notes: notes || null,
+    };
+
     if (!assignment) {
-      assignment = await Assignment.create(
-        { studentId, tutorId, purchaseId, assignedBy: adminId, notes: notes || null },
-        { transaction: t }
-      );
+      try {
+        assignment = await Assignment.create(payload, { transaction: t });
+      } catch (err) {
+        if (err instanceof UniqueConstraintError) {
+          // Another tx created it between our findOne and create -> re-read then update
+          assignment = await Assignment.findOne({
+            where: { purchaseId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+          });
+          await assignment.update(payload, { transaction: t });
+        } else {
+          throw err;
+        }
+      }
     } else {
-      await assignment.update(
-        { studentId, tutorId, assignedBy: adminId, notes: notes || null },
-        { transaction: t }
-      );
+      await assignment.update(payload, { transaction: t });
     }
 
-    // Emails (best-effort)
+    // 5) Best-effort emails (do NOT fail the tx if they break)
     if (sendVerifyEmail && assignmentStudentEmail && assignmentTutorEmail) {
       try {
-        const mailToStudent = assignmentStudentEmail({ purchase, tutor });
+        const mailToStudent = assignmentStudentEmail({
+          purchase,
+          tutor: { id: tutor.id, name: tutor.name },
+        });
         await sendVerifyEmail(student.email, mailToStudent.subject, mailToStudent.html);
 
-        const mailToTutor = assignmentTutorEmail({ purchase, student });
+        const mailToTutor = assignmentTutorEmail({
+          purchase,
+          student: { id: student.id, name: student.name },
+        });
         await sendVerifyEmail(tutor.email, mailToTutor.subject, mailToTutor.html);
       } catch (err) {
-        // Do not fail the transaction because of email; just log
-        console.warn("[assignment.service] email send failed:", err?.message || err);
+        console.warn('[assignment.service] email send failed:', err?.message || err);
       }
     }
 
     return assignment;
   });
 }
-
 /**
  * Update an assignment (supports tutorId + notes).
  */

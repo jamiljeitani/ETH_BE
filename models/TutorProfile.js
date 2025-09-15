@@ -15,9 +15,9 @@ module.exports = (sequelize, DataTypes) => {
     tutoringType: { type: DataTypes.ENUM('online', 'in-person', 'hybrid'), allowNull: false },
     payoutMethod: { type: DataTypes.STRING, allowNull: false },
 
-    rankId: { type: DataTypes.UUID, allowNull: false }, // TutorRank
-    idDocumentUrl: { type: DataTypes.STRING, allowNull: false },
-    profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
+    rankId: { type: DataTypes.UUID, allowNull: true }, // TutorRank
+    idDocumentUrl: { type: DataTypes.STRING, allowNull: true },
+    profilePictureUrl: { type: DataTypes.STRING, allowNull: true },
 
     preferredGradesText: { type: DataTypes.STRING, allowNull: true }
   }, {

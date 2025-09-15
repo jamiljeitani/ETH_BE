@@ -11,9 +11,10 @@ const putMe = Joi.object({
   tutoringType: Joi.string().valid('online', 'in-person', 'hybrid').required(),
   payoutMethod: Joi.string().trim().min(2).max(50).required(),
 
-  rankId: Joi.string().uuid().required(),
-  idDocumentUrl: Joi.string().uri().required(),
-  profilePictureUrl: Joi.string().uri().required(),
+  // rankId: Joi.string().uuid().required(),
+  // commented for testing
+  // idDocumentUrl: Joi.string().uri().required(),
+  // profilePictureUrl: Joi.string().uri().required(),
   preferredGradesText: Joi.string().max(200).allow('', null),
 
   languageIds: Joi.array().items(Joi.string().uuid()).min(1).required(),

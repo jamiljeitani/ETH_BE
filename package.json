@@ -12,7 +12,8 @@
     "migration": "node scripts/migration.js",
     "migration:subject": "node scripts/subject-migration.js",
     "migration:bundle": "node scripts/bundle-migration.js",
-    "migration:bactype": "node scripts/bactype-migration.js"
+    "migration:bactype": "node scripts/bactype-migration.js",
+    "migration:tutor-profile": "node scripts/tutor-profile-migration.js"
   },
   "keywords": [],
   "author": "",

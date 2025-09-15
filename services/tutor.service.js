@@ -11,11 +11,24 @@ const includeTree = [
 ];
 
 async function getMe(userId) {
-  const user = await User.findByPk(userId, {
-    include: [{ model: TutorProfile, as: 'tutorProfile', include: includeTree }]
-  });
+  const user = await User.findByPk(userId);
   if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
-  return user.tutorProfile || null;
+
+  const withProfile = await User.findByPk(userId, {
+    include: [{
+      model: TutorProfile,
+      as: 'tutorProfile',
+      required: true,            // INNER JOIN: if no profile, no row
+      include: includeTree ?? [],
+    }],
+  });
+
+  if (!withProfile) {           // means user exists but no matching tutorProfile
+    const e = new Error('Tutor profile not found for this user');
+    e.status = 404;
+    throw e;
+  }
+  return withProfile.tutorProfile;
 }
 
 async function upsertMe(userId, payload) {
@@ -25,9 +38,6 @@ async function upsertMe(userId, payload) {
     preferredGradesText, languageIds, subjectIds, bacTypeIds
   } = payload;
 
-  // Validate rank
-  const rank = await TutorRank.findByPk(rankId);
-  if (!rank) { const e = new Error('Invalid rankId'); e.status = 400; throw e; }
 
   return sequelize.transaction(async (t) => {
     let profile = await TutorProfile.findOne({ where: { userId }, transaction: t });
