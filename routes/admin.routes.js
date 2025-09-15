@@ -32,12 +32,14 @@ router.use(authMiddleware, requireRole("admin"));
 /* ---------- Languages ---------- */
 router.get("/languages", ensureCtrl("listLanguages"));
 router.post("/languages", safeValidate(adminSchema.createLanguage), ensureCtrl("createLanguage"));
-router.put("/languages/:id",
+router.put(
+  "/languages/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateLanguage),
   ensureCtrl("updateLanguage")
 );
-router.delete("/languages/:id",
+router.delete(
+  "/languages/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteLanguage")
 );
@@ -45,12 +47,14 @@ router.delete("/languages/:id",
 /* ---------- Subjects ---------- */
 router.get("/subjects", ensureCtrl("listSubjects"));
 router.post("/subjects", safeValidate(adminSchema.createSubject), ensureCtrl("createSubject"));
-router.put("/subjects/:id",
+router.put(
+  "/subjects/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateSubject),
   ensureCtrl("updateSubject")
 );
-router.delete("/subjects/:id",
+router.delete(
+  "/subjects/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteSubject")
 );
@@ -58,12 +62,14 @@ router.delete("/subjects/:id",
 /* ---------- Grades ---------- */
 router.get("/grades", ensureCtrl("listGrades"));
 router.post("/grades", safeValidate(adminSchema.createGrade), ensureCtrl("createGrade"));
-router.put("/grades/:id",
+router.put(
+  "/grades/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateGrade),
   ensureCtrl("updateGrade")
 );
-router.delete("/grades/:id",
+router.delete(
+  "/grades/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteGrade")
 );
@@ -71,12 +77,14 @@ router.delete("/grades/:id",
 /* ---------- Bac Types ---------- */
 router.get("/bac-types", ensureCtrl("listBacTypes"));
 router.post("/bac-types", safeValidate(adminSchema.createBacType), ensureCtrl("createBacType"));
-router.put("/bac-types/:id",
+router.put(
+  "/bac-types/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateBacType),
   ensureCtrl("updateBacType")
 );
-router.delete("/bac-types/:id",
+router.delete(
+  "/bac-types/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteBacType")
 );
@@ -84,26 +92,30 @@ router.delete("/bac-types/:id",
 /* ---------- Tutor Ranks ---------- */
 router.get("/tutor-ranks", ensureCtrl("listTutorRanks"));
 router.post("/tutor-ranks", safeValidate(adminSchema.createTutorRank), ensureCtrl("createTutorRank"));
-router.put("/tutor-ranks/:id",
+router.put(
+  "/tutor-ranks/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateTutorRank),
   ensureCtrl("updateTutorRank")
 );
-router.delete("/tutor-ranks/:id",
+router.delete(
+  "/tutor-ranks/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteTutorRank")
 );
 
 /* ---------- Sessions (SessionType) ---------- */
 router.get("/sessions", ensureCtrl("listSessions"));
-router.get("/sessions/count", ensureCtrl("countSessions")); // NEW
-router.post("/sessions", safeValidate(adminSchema.createSessionType), ensureCtrl("createSession"));
-router.put("/sessions/:id",
+router.get("/sessions/count", ensureCtrl("countSessions")); // counts
+router.post("/sessions", safeValidate(adminSchema.createSession), ensureCtrl("createSession")); // ✅ schema key
+router.put(
+  "/sessions/:id",
   safeValidate(adminSchema.idParam, "params"),
-  safeValidate(adminSchema.updateSessionType),
+  safeValidate(adminSchema.updateSession), // ✅ schema key
   ensureCtrl("updateSession")
 );
-router.delete("/sessions/:id",
+router.delete(
+  "/sessions/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteSession")
 );
@@ -111,71 +123,106 @@ router.delete("/sessions/:id",
 /* ---------- Bundles ---------- */
 router.get("/bundles", ensureCtrl("listBundles"));
 router.post("/bundles", safeValidate(adminSchema.createBundle), ensureCtrl("createBundle"));
-router.put("/bundles/:id",
+router.put(
+  "/bundles/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.updateBundle),
   ensureCtrl("updateBundle")
 );
-router.delete("/bundles/:id",
+router.delete(
+  "/bundles/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteBundle")
 );
 
+/* ---------- Assignments ---------- */
+router.get(
+  "/assignments",
+  safeValidate(adminSchema.queryAssignments, "query"),
+  ensureCtrl("listAssignments")
+);
+router.post(
+  "/assignments",
+  safeValidate(adminSchema.createAssignment),
+  ensureCtrl("createAssignment")
+);
+router.put(
+  "/assignments/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  safeValidate(adminSchema.updateAssignment),
+  ensureCtrl("updateAssignment")
+);
+router.delete(
+  "/assignments/:id",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("deleteAssignment")
+);
+
 /* ---------- Tutor change requests ---------- */
 router.get("/tutor-change-requests", ensureCtrl("listChangeRequests"));
-router.patch("/tutor-change-requests/:id",
+router.patch(
+  "/tutor-change-requests/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.decisionChangeRequest),
   ensureCtrl("decideChangeRequest")
 );
 
 /* ---------- Feedback (admin-only) ---------- */
-router.get("/feedback",
+router.get(
+  "/feedback",
   safeValidate(adminSchema.feedbackListQuery, "query"),
   ensureCtrl("listFeedback")
 );
 
 /* ---------- Manual Payments ---------- */
-router.get("/payments",
+router.get(
+  "/payments",
   safeValidate(paymentSchema?.adminListQuery, "query"),
   ensureCtrl("listManualPayments")
 );
-router.patch("/payments/:transactionId/approve",
+router.patch(
+  "/payments/:transactionId/approve",
   safeValidate(paymentSchema?.adminDecisionParams, "params"),
   safeValidate(paymentSchema?.adminDecisionBody, "body"),
   ensureCtrl("approveManualPayment")
 );
-router.patch("/payments/:transactionId/reject",
+router.patch(
+  "/payments/:transactionId/reject",
   safeValidate(paymentSchema?.adminDecisionParams, "params"),
   safeValidate(paymentSchema?.adminDecisionBody, "body"),
   ensureCtrl("rejectManualPayment")
 );
 
 /* ---------- Reports ---------- */
-router.get("/reports/consumption",
+router.get(
+  "/reports/consumption",
   safeValidate(reportSchema.consumptionQuery, "query"),
   ensureCtrl("reportConsumption")
 );
-router.get("/reports/payouts",
+router.get(
+  "/reports/payouts",
   safeValidate(reportSchema.payoutsQuery, "query"),
   ensureCtrl("reportPayouts")
 );
 
 /* ---------- Users & Purchases (Assignments support) ---------- */
 router.get("/users", ensureCtrl("listUsers"));
-router.get("/users/count", ensureCtrl("countUsers")); // NEW
+router.get("/users/count", ensureCtrl("countUsers"));
 
-router.get("/students/:id/purchases",
+router.get(
+  "/students/:id/purchases",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("listStudentPurchases")
 );
 
 /* ---------- Generic Users (Dashboard actions) ---------- */
-router.patch("/users/:id",
+router.patch(
+  "/users/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("updateUser")
 );
-router.delete("/users/:id",
+router.delete(
+  "/users/:id",
   safeValidate(adminSchema.idParam, "params"),
   ensureCtrl("deleteUser")
 );
@@ -185,7 +232,11 @@ router.get("/dashboard/stats", ensureCtrl("getDashboardStats"));
 router.get("/dashboard/recent-students", ensureCtrl("getRecentStudents"));
 router.get("/dashboard/recent-tutors", ensureCtrl("getRecentTutors"));
 
-router.get('/tutor-ranks/usage', ensureCtrl('getTutorRankUsage'));
-router.patch('/tutors/:id/rank', ensureCtrl('assignTutorRank'));
+/* ---------- Tutor Ranks analytics & assignment ---------- */
+router.get("/tutor-ranks/usage", ensureCtrl("getTutorRankUsage"));
+router.patch("/tutors/:id/rank",
+  safeValidate(adminSchema.idParam, "params"),
+  ensureCtrl("assignTutorRank")
+);
 
 module.exports = router;

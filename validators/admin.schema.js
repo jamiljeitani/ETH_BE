@@ -4,6 +4,7 @@ const Joi = require('joi');
 // Params
 const idParam = Joi.object({ id: Joi.string().uuid().required() });
 
+
 // Simple name entities (Subject, Grade, BacType)
 const nameCreate = Joi.object({ name: Joi.string().trim().min(2).max(120).required() });
 const nameUpdate = Joi.object({ name: Joi.string().trim().min(2).max(120).optional() });
@@ -93,6 +94,15 @@ const feedbackListQuery = Joi.object({
   to: Joi.date().iso().optional()
 });
 
+
+const updateAssignment = Joi.object({
+  tutorId: Joi.string().uuid().optional(),
+  notes: Joi.string().max(300).allow('', null),
+});
+
+
+
+
 module.exports = {
   idParam,
   // simple name entities
@@ -106,7 +116,7 @@ module.exports = {
   createSessionType, updateSessionType,
   createBundle, updateBundle,
   // assignments & change requests
-  createAssignment, queryAssignments,
+  createAssignment, updateAssignment, queryAssignments,
   decisionChangeRequest, idParamChangeReq,
   feedbackListQuery
 };

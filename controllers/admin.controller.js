@@ -16,6 +16,7 @@ const {
   TutorProfile,
   BacType,
   Subject,
+  TutorRank, // ✅ missing before
 } = require("../models");
 
 /* -----------------------
@@ -123,6 +124,18 @@ const createAssignment = async (req, res, next) => {
     res.status(201).json(data);
   } catch (e) { next(e); }
 };
+const updateAssignment = async (req, res, next) => {
+  try {
+    const data = await assignSvc.updateAssignment(req.user.id, req.params.id, req.body);
+    res.json(data);
+  } catch (e) { next(e); }
+};
+const deleteAssignment = async (req, res, next) => {
+  try {
+    const data = await assignSvc.removeAssignment(req.params.id);
+    res.json(data);
+  } catch (e) { next(e); }
+};
 
 /* -----------------------
    Change Requests (admin)
@@ -178,37 +191,33 @@ const listUsers = async (req, res, next) => {
       where,
       attributes: ["id", "email", "role", "createdAt"],
       include: [
-        { model: StudentProfile, as: "studentProfile", required: false }, // all fields
-        { model: TutorProfile, as: "tutorProfile", required: false },     // all fields
+        { model: StudentProfile, as: "studentProfile", required: false },
+        { model: TutorProfile, as: "tutorProfile", required: false },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    // Preserve full nested objects, then add computed fields
     const formattedUsers = users.map((u) => {
-      const p = u.get({ plain: true }); // or u.toJSON()
-
+      const p = u.get({ plain: true });
       const displayName =
-          p.role === "student"
-              ? (p.studentProfile?.fullName || p.email)
-              : p.role === "tutor"
-                  ? (p.tutorProfile?.fullName || p.email)
-                  : p.email;
+        p.role === "student"
+          ? (p.studentProfile?.fullName || p.email)
+          : p.role === "tutor"
+          ? (p.tutorProfile?.fullName || p.email)
+          : p.email;
 
       const profileInfo =
-          p.role === "student"
-              ? p.studentProfile?.school
-              : p.role === "tutor"
-                  ? p.tutorProfile?.educationLevel
-                  : null;
+        p.role === "student"
+          ? p.studentProfile?.school
+          : p.role === "tutor"
+          ? p.tutorProfile?.educationLevel
+          : null;
 
       return { ...p, displayName, profileInfo };
     });
 
     res.json({ users: formattedUsers });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 const listStudentPurchases = async (req, res, next) => {
@@ -377,7 +386,6 @@ const updateUser = async (req, res, next) => {
     });
     if (!user) return res.status(404).json({ error: { message: "User not found" } });
 
-    // Allow updating display name on linked profile if provided
     if (typeof name === "string" && name.trim()) {
       if (user.role === "student" && user.studentProfile) {
         await user.studentProfile.update({ fullName: name.trim() });
@@ -386,7 +394,6 @@ const updateUser = async (req, res, next) => {
       }
     }
 
-    // Optionally allow other fields at User level (minimal safe handling)
     if (Object.keys(rest).length) await user.update(rest);
 
     res.json({ ok: true });
@@ -396,16 +403,12 @@ const updateUser = async (req, res, next) => {
 const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    // prevent accidental self-delete
     if (String(req.user?.id) === String(id)) {
       return res.status(400).json({ error: { message: "You cannot delete your own account." } });
     }
-
     const user = await User.findByPk(id);
     if (!user) return res.status(404).json({ error: { message: "User not found" } });
-
-    await user.destroy(); // expect FK ON DELETE CASCADE for profiles, etc.
+    await user.destroy();
     res.json({ deleted: true });
   } catch (e) { next(e); }
 };
@@ -451,7 +454,7 @@ module.exports = {
   listBundles, createBundle, updateBundle, deleteBundle,
 
   // assignments & requests
-  listAssignments, createAssignment,
+  listAssignments, createAssignment, updateAssignment, deleteAssignment,
   listChangeRequests, decideChangeRequest,
 
   // feedback & reports
