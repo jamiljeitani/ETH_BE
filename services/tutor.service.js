@@ -1,7 +1,7 @@
 // services/tutor.service.js
 const {
   sequelize, User, TutorProfile, TutorRank, Language, Subject, BacType,
-  Assignment, StudentProfile
+  Assignment, StudentProfile, SessionType, Bundle, Purchase
 } = require('../models');
 
 const includeTree = [
@@ -49,7 +49,6 @@ async function upsertMe(userId, payload) {
       }, { transaction: t });
     }
 
-    // M2M safely handle empty arrays
     const langs = languageIds.length ? await Language.findAll({ where: { id: languageIds }, transaction: t }) : [];
     if (languageIds.length && langs.length !== languageIds.length) { const e = new Error('Invalid languageIds'); e.status = 400; throw e; }
     await profile.setLanguages(langs, { transaction: t });
@@ -66,7 +65,7 @@ async function upsertMe(userId, payload) {
   });
 }
 
-/** NEW: return unique students assigned to this tutor */
+/** Unique students assigned to this tutor */
 async function listAssignedStudents(tutorUserId) {
   const rows = await Assignment.findAll({
     where: { tutorId: tutorUserId },
@@ -92,6 +91,47 @@ async function listAssignedStudents(tutorUserId) {
     }
   }
   return out;
+}
+
+/** NEW: full assignments (student + purchase label) for this tutor */
+async function listAssignmentsDetailed(tutorUserId) {
+  const rows = await Assignment.findAll({
+    where: { tutorId: tutorUserId },
+    include: [
+      {
+        association: 'student',
+        attributes: ['id', 'email'],
+        include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }]
+      },
+      {
+        association: 'purchase',
+        include: [
+          { model: SessionType, as: 'sessionType', attributes: ['name', 'hourlyRate'] },
+          { model: Bundle, as: 'bundle', attributes: ['name'] },
+        ],
+      },
+    ],
+    order: [['createdAt', 'DESC']],
+  });
+
+  return rows.map(a => ({
+    id: a.id,
+    student: {
+      id: a.student?.id,
+      email: a.student?.email,
+      fullName: a.student?.studentProfile?.fullName || a.student?.email,
+    },
+    purchase: a.purchase ? {
+      id: a.purchase.id,
+      hours: a.purchase.hours,
+      status: a.purchase.status,
+      displayName: a.purchase?.bundleId
+        ? `${a.purchase?.bundle?.name || 'Bundle'} (${a.purchase?.hours}h)`
+        : `${a.purchase?.sessionType?.name || 'Session'} (${a.purchase?.hours}h)`,
+      sessionType: a.purchase?.sessionType ? { name: a.purchase.sessionType.name } : undefined,
+      bundle: a.purchase?.bundle ? { name: a.purchase.bundle.name } : undefined,
+    } : null,
+  }));
 }
 
 async function updateAvatar(userId, avatarUrl) {
@@ -126,4 +166,11 @@ async function updateIdDocument(userId, documentUrl) {
   return getMe(userId);
 }
 
-module.exports = { getMe, upsertMe, listAssignedStudents, updateAvatar, updateIdDocument };
+module.exports = {
+  getMe,
+  upsertMe,
+  listAssignedStudents,
+  listAssignmentsDetailed, 
+  updateAvatar,
+  updateIdDocument
+};

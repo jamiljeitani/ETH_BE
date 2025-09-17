@@ -17,11 +17,19 @@ async function putMe(req, res, next) {
   } catch (e) { next(e); }
 }
 
-/** NEW: list students assigned to the logged-in tutor */
+/** Students (unique) assigned to this tutor */
 async function listAssignedStudents(req, res, next) {
   try {
     const students = await svc.listAssignedStudents(req.user.id);
     res.json({ students });
+  } catch (e) { next(e); }
+}
+
+/** NEW: Assignments (student + purchase) for this tutor */
+async function listMyAssignments(req, res, next) {
+  try {
+    const assignments = await svc.listAssignmentsDetailed(req.user.id);
+    res.json({ assignments });
   } catch (e) { next(e); }
 }
 
@@ -31,12 +39,10 @@ async function uploadAvatar(req, res, next) {
       return res.status(400).json({ error: { message: 'No file uploaded' } });
     }
     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-    const profile = await svc.updateAvatar(req.user.id, avatarUrl); // ✅ use svc
+    const profile = await svc.updateAvatar(req.user.id, avatarUrl);
     res.json({ profile, avatarUrl, message: 'Avatar uploaded successfully' });
   } catch (e) {
-    if (req.file) {
-      try { await fs.unlink(req.file.path); } catch {}
-    }
+    if (req.file) { try { await fs.unlink(req.file.path); } catch {} }
     next(e);
   }
 }
@@ -47,14 +53,19 @@ async function uploadIdDocument(req, res, next) {
       return res.status(400).json({ error: { message: 'No file uploaded' } });
     }
     const documentUrl = `/uploads/documents/${req.file.filename}`;
-    const profile = await svc.updateIdDocument(req.user.id, documentUrl); // ✅ use svc
+    const profile = await svc.updateIdDocument(req.user.id, documentUrl);
     res.json({ profile, documentUrl, message: 'ID document uploaded successfully' });
   } catch (e) {
-    if (req.file) {
-      try { await fs.unlink(req.file.path); } catch {}
-    }
+    if (req.file) { try { await fs.unlink(req.file.path); } catch {} }
     next(e);
   }
 }
 
-module.exports = { getMe, putMe, listAssignedStudents, uploadAvatar, uploadIdDocument };
+module.exports = {
+  getMe,
+  putMe,
+  listAssignedStudents,
+  listMyAssignments,   
+  uploadAvatar,
+  uploadIdDocument
+};

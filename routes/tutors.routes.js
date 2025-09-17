@@ -39,8 +39,11 @@ const upload = multer({
 router.get('/me', ctrl.getMe);
 router.put('/me', validate(schema.putMe), ctrl.putMe);
 
-/** NEW: Assigned students list for the tutor */
+/** Assigned students (unique list) */
 router.get('/me/assigned-students', ctrl.listAssignedStudents);
+
+/** NEW: Assignments list (student + purchase) */
+router.get('/me/assignments', ctrl.listMyAssignments); // ✅ NEW
 
 /** File uploads */
 router.post('/me/avatar', upload.single('file'), ctrl.uploadAvatar);
