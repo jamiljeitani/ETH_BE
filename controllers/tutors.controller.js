@@ -17,27 +17,25 @@ async function putMe(req, res, next) {
   } catch (e) { next(e); }
 }
 
+/** NEW: list students assigned to the logged-in tutor */
+async function listAssignedStudents(req, res, next) {
+  try {
+    const students = await svc.listAssignedStudents(req.user.id);
+    res.json({ students });
+  } catch (e) { next(e); }
+}
+
 async function uploadAvatar(req, res, next) {
   try {
     if (!req.file) {
       return res.status(400).json({ error: { message: 'No file uploaded' } });
     }
-
     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-    const profile = await tutorSvc.updateAvatar(req.user.id, avatarUrl);
-
-    res.json({
-      profile,
-      avatarUrl,
-      message: 'Avatar uploaded successfully'
-    });
+    const profile = await svc.updateAvatar(req.user.id, avatarUrl); // ✅ use svc
+    res.json({ profile, avatarUrl, message: 'Avatar uploaded successfully' });
   } catch (e) {
     if (req.file) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (unlinkError) {
-        console.error('Failed to clean up uploaded file:', unlinkError);
-      }
+      try { await fs.unlink(req.file.path); } catch {}
     }
     next(e);
   }
@@ -48,25 +46,15 @@ async function uploadIdDocument(req, res, next) {
     if (!req.file) {
       return res.status(400).json({ error: { message: 'No file uploaded' } });
     }
-
     const documentUrl = `/uploads/documents/${req.file.filename}`;
-    const profile = await tutorSvc.updateIdDocument(req.user.id, documentUrl);
-
-    res.json({
-      profile,
-      documentUrl,
-      message: 'ID document uploaded successfully'
-    });
+    const profile = await svc.updateIdDocument(req.user.id, documentUrl); // ✅ use svc
+    res.json({ profile, documentUrl, message: 'ID document uploaded successfully' });
   } catch (e) {
     if (req.file) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (unlinkError) {
-        console.error('Failed to clean up uploaded file:', unlinkError);
-      }
+      try { await fs.unlink(req.file.path); } catch {}
     }
     next(e);
   }
 }
 
-module.exports = { getMe, putMe, uploadAvatar, uploadIdDocument };
+module.exports = { getMe, putMe, listAssignedStudents, uploadAvatar, uploadIdDocument };
