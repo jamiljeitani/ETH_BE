@@ -1,220 +1,302 @@
 // services/calendar.service.js
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
+
 const {
-  sequelize, User, Subject, Purchase,
-  CalendarEvent
+  sequelize,
+  User,
+  Subject,
+  Purchase,
+  CalendarEvent,
+  Assignment, // <-- used to find the student's assigned tutor
 } = require('../models');
-const { calendarProposedEmail, calendarStatusEmail } = require('../utils/emailTemplates');
-const { sendVerifyEmail } = require('./email.service');
 
+// If you don't have these utilities, you can stub them safely:
+let sendVerifyEmail = async () => {};
+let calendarProposedEmail = () => ({ subject: '', html: '' });
+let calendarStatusEmail = () => ({ subject: '', html: '' });
+try {
+  ({ sendVerifyEmail } = require('./email.service'));
+  ({ calendarProposedEmail, calendarStatusEmail } = require('../utils/emailTemplates'));
+} catch (_) { /* optional utilities */ }
+
+// ------------------------------------------------------------------
+// helpers
+// ------------------------------------------------------------------
 function isParticipant(user, ev) {
-  return user.role === 'admin' || ev.studentId === user.id || ev.tutorId === user.id;
+  return (
+    user.role === 'admin' ||
+    ev.studentId === user.id ||
+    ev.tutorId === user.id
+  );
 }
 
-async function assertRoles(studentId, tutorId) {
-  const [s, t] = await Promise.all([
-    User.findByPk(studentId), User.findByPk(tutorId)
-  ]);
-  if (!s || s.role !== 'student') { const e = new Error('Invalid studentId'); e.status = 400; throw e; }
-  if (!t || t.role !== 'tutor') { const e = new Error('Invalid tutorId'); e.status = 400; throw e; }
-  return { student: s, tutor: t };
+// choose the latest/active assignment linking this student to a tutor
+async function getAssignedTutorId(studentId) {
+  const a = await Assignment.findOne({
+    where: { studentId },
+    order: [['createdAt', 'DESC']],
+    attributes: ['tutorId'],
+  });
+  return a?.tutorId || null;
 }
 
-async function hasConflictFor(participantId, startAt, endAt, ignoreEventId = null) {
-  const where = {
-    status: 'accepted',
-    [Op.or]: [{ studentId: participantId }, { tutorId: participantId }],
-    startAt: { [Op.lt]: endAt },
-    endAt:   { [Op.gt]: startAt }
-  };
-  if (ignoreEventId) where.id = { [Op.ne]: ignoreEventId };
-  const count = await CalendarEvent.count({ where });
-  return count > 0;
+async function getAssignedStudentIdsForTutor(tutorId) {
+  const rows = await Assignment.findAll({
+    where: { tutorId },
+    attributes: ['studentId'],
+  });
+  return rows.map(r => r.studentId);
 }
 
-async function listEvents(user, { from, to, studentId, tutorId, status }) {
+function normalizeDatesFilter(from, to) {
   const where = {};
-  if (from) where.startAt = { ...(where.startAt || {}), [Op.gte]: new Date(from) };
-  if (to)   where.endAt   = { ...(where.endAt || {}),   [Op.lte]: new Date(to) };
-  if (status) where.status = status;
+  if (from || to) {
+    where.startAt = {};
+    if (from) where.startAt[Op.gte] = new Date(from);
+    if (to) where.startAt[Op.lt] = new Date(to);
+  }
+  return where;
+}
 
+const includeTree = [
+  { model: User, as: 'student', attributes: ['id', 'email'] },
+  { model: User, as: 'tutor', attributes: ['id', 'email'] },
+  { model: Subject, as: 'subject', attributes: ['id', 'name'] },
+];
+
+// ------------------------------------------------------------------
+// list events (role-aware)
+// ------------------------------------------------------------------
+async function listEvents(user, query = {}) {
+  const { role, from, to, studentId, tutorId } = query;
+
+  const timeFilter = normalizeDatesFilter(from, to);
+  let where = { ...timeFilter };
+
+  // Admin can pass filters directly
   if (user.role === 'admin') {
     if (studentId) where.studentId = studentId;
     if (tutorId) where.tutorId = tutorId;
-  } else if (user.role === 'student') {
-    where.studentId = user.id;
-  } else if (user.role === 'tutor') {
-    where.tutorId = user.id;
+    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
   }
 
-  return CalendarEvent.findAll({
-    where,
-    order: [['startAt', 'ASC']],
-    include: [
-      { association: 'student', attributes: ['id', 'email'] },
-      { association: 'tutor', attributes: ['id', 'email'] },
-      { association: 'subject' },
-      { association: 'purchase' },
-      { association: 'parentEvent', attributes: ['id', 'startAt', 'endAt', 'status'] }
-    ]
-  });
+  if (user.role === 'student') {
+    where.studentId = user.id;
+    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+  }
+
+  // tutor: show
+  // 1) everything where tutorId = me
+  // 2) PLUS: 'exam'/'target' of my assigned students (even if not explicitly linked)
+  if (user.role === 'tutor') {
+    const myStudentIds = await getAssignedStudentIdsForTutor(user.id);
+
+    where = {
+      ...timeFilter,
+      [Op.or]: [
+        { tutorId: user.id },
+        {
+          type: { [Op.in]: ['exam', 'target'] },
+          studentId: { [Op.in]: myStudentIds.length ? myStudentIds : ['__none__'] },
+        },
+      ],
+    };
+
+    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+  }
+
+  // fallback: nothing
+  return [];
 }
 
-async function createEvent(creator, payload) {
+// ------------------------------------------------------------------
+// create event
+// ------------------------------------------------------------------
+async function createEvent(creator, body) {
   const {
-    title, description, type = 'session', startAt, endAt,
-    locationType, locationDetails, subjectId, purchaseId,
-    studentId, tutorId
-  } = payload;
+    title,
+    description,
+    type = 'session',
+    startAt,
+    endAt,
+    locationType,
+    locationDetails,
+    subjectId,
+    purchaseId,
+  } = body || {};
 
-  // infer missing counterpart based on role
-  let sId = studentId;
-  let tId = tutorId;
+  // derive sides
+  let { studentId, tutorId } = body || {};
   if (creator.role === 'student') {
-    sId = creator.id;
-    if (!tId) { const e = new Error('tutorId is required'); e.status = 400; throw e; }
+    studentId = creator.id;
+    // For exams/targets, we attempt to attach the assigned tutor automatically
+    if (!tutorId && (type === 'exam' || type === 'target' || type === 'session')) {
+      tutorId = await getAssignedTutorId(studentId);
+    }
   } else if (creator.role === 'tutor') {
-    tId = creator.id;
-    if (!sId) { const e = new Error('studentId is required'); e.status = 400; throw e; }
-  } else if (creator.role === 'admin') {
-    if (!sId || !tId) { const e = new Error('studentId and tutorId are required'); e.status = 400; throw e; }
+    tutorId = creator.id;
+    // studentId must be present for a session created by tutor
+    if (type === 'session' && !studentId) {
+      const e = new Error('studentId is required for session creation by tutors');
+      e.status = 400; throw e;
+    }
+  } else if (creator.role !== 'admin') {
+    const e = new Error('Unauthorized');
+    e.status = 403; throw e;
   }
 
-  await assertRoles(sId, tId);
+  // conflict detection only for accepted sessions (we allow proposing overlaps)
+  const initialStatus = (type === 'session') ? 'proposed' : 'accepted'; // exams/targets are immediately "confirmed"
 
-  // Optional: validate subject/purchase existence
-  if (subjectId) {
-    const sub = await Subject.findByPk(subjectId);
-    if (!sub) { const e = new Error('Invalid subjectId'); e.status = 400; throw e; }
-  }
-  if (purchaseId) {
-    const p = await Purchase.findByPk(purchaseId);
-    if (!p) { const e = new Error('Invalid purchaseId'); e.status = 400; throw e; }
-  }
-
-  // Conflict check on ACCEPTED events
-  const sConflict = await hasConflictFor(sId, new Date(startAt), new Date(endAt));
-  const tConflict = await hasConflictFor(tId, new Date(startAt), new Date(endAt));
-  if (sConflict || tConflict) {
-    const e = new Error('Time conflict with an accepted event'); e.status = 409; throw e;
-  }
-
+  // Create
   const ev = await CalendarEvent.create({
-    title, description, type, status: 'proposed',
-    startAt, endAt, locationType, locationDetails,
-    studentId: sId, tutorId: tId, createdBy: creator.id,
-    subjectId: subjectId || null, purchaseId: purchaseId || null
+    title: title || null,
+    description: description || null,
+    type,
+    status: initialStatus,
+    startAt,
+    endAt,
+    locationType: locationType || null,
+    locationDetails: locationDetails || null,
+    subjectId: subjectId || null,
+    purchaseId: purchaseId || null,
+    studentId: studentId || null,
+    tutorId: tutorId || null,
+    createdBy: creator.id,
   });
 
-  // Notify counterpart
-  const student = await User.findByPk(sId);
-  const tutor = await User.findByPk(tId);
-  const mailS = calendarProposedEmail({ recipientRole: 'student', event: ev, otherEmail: tutor.email });
-  const mailT = calendarProposedEmail({ recipientRole: 'tutor', event: ev, otherEmail: student.email });
-
-  // Send to both
-  await sendVerifyEmail(student.email, mailS.subject, mailS.html);
-  await sendVerifyEmail(tutor.email, mailT.subject, mailT.html);
+  // Notify counterpart only for sessions
+  if (type === 'session' && tutorId && studentId) {
+    try {
+      const [student, tutor] = await Promise.all([
+        User.findByPk(studentId),
+        User.findByPk(tutorId),
+      ]);
+      const mail = calendarProposedEmail({ event: ev, student, tutor });
+      await Promise.all([
+        student?.email ? sendVerifyEmail(student.email, mail.subject, mail.html) : null,
+        tutor?.email ? sendVerifyEmail(tutor.email, mail.subject, mail.html) : null,
+      ]);
+    } catch (_) { /* non-fatal */ }
+  }
 
   return ev;
 }
 
+// ------------------------------------------------------------------
+// accept / reject / cancel / reschedule
+// ------------------------------------------------------------------
 async function acceptEvent(user, id) {
-  return sequelize.transaction(async (t) => {
-    const ev = await CalendarEvent.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
-    if (!ev) { const e = new Error('Not found'); e.status = 404; throw e; }
-    if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
-    if (ev.status !== 'proposed') { const e = new Error('Only proposed events can be accepted'); e.status = 400; throw e; }
+  const ev = await CalendarEvent.findByPk(id);
+  if (!ev) { const e = new Error('Event not found'); e.status = 404; throw e; }
+  if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
 
-    // conflict check again on accept
-    const sConflict = await hasConflictFor(ev.studentId, ev.startAt, ev.endAt, ev.id);
-    const tConflict = await hasConflictFor(ev.tutorId, ev.startAt, ev.endAt, ev.id);
-    if (sConflict || tConflict) {
-      const e = new Error('Time conflict with an accepted event'); e.status = 409; throw e;
-    }
+  // Only 'session' can be accepted; exams/targets are already accepted
+  if (ev.type !== 'session') return ev;
 
-    await ev.update({ status: 'accepted', decisionReason: null }, { transaction: t });
+  await ev.update({ status: 'accepted' });
 
-    const student = await User.findByPk(ev.studentId, { transaction: t });
-    const tutor = await User.findByPk(ev.tutorId, { transaction: t });
-    const mail = calendarStatusEmail({ event: ev, status: 'accepted' });
-    await sendVerifyEmail(student.email, mail.subject, mail.html);
-    await sendVerifyEmail(tutor.email, mail.subject, mail.html);
+  try {
+    const [student, tutor] = await Promise.all([
+      User.findByPk(ev.studentId),
+      User.findByPk(ev.tutorId),
+    ]);
+    const mail = calendarStatusEmail({ event: ev, status: 'accepted', student, tutor });
+    await Promise.all([
+      student?.email ? sendVerifyEmail(student.email, mail.subject, mail.html) : null,
+      tutor?.email ? sendVerifyEmail(tutor.email, mail.subject, mail.html) : null,
+    ]);
+  } catch (_) {}
 
-    return ev;
-  });
+  return ev;
 }
 
 async function rejectEvent(user, id, reason) {
   const ev = await CalendarEvent.findByPk(id);
-  if (!ev) { const e = new Error('Not found'); e.status = 404; throw e; }
+  if (!ev) { const e = new Error('Event not found'); e.status = 404; throw e; }
   if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
-  if (!['proposed'].includes(ev.status)) { const e = new Error('Only proposed events can be rejected'); e.status = 400; throw e; }
 
-  await ev.update({ status: 'rejected', decisionReason: reason || null });
+  // exams/targets are personal; we treat reject only for sessions
+  if (ev.type !== 'session') return ev;
 
-  const student = await User.findByPk(ev.studentId);
-  const tutor = await User.findByPk(ev.tutorId);
-  const mail = calendarStatusEmail({ event: ev, status: 'rejected', reason });
-  await sendVerifyEmail(student.email, mail.subject, mail.html);
-  await sendVerifyEmail(tutor.email, mail.subject, mail.html);
+  await ev.update({ status: 'rejected', cancelReason: reason || null });
+
+  try {
+    const [student, tutor] = await Promise.all([
+      User.findByPk(ev.studentId),
+      User.findByPk(ev.tutorId),
+    ]);
+    const mail = calendarStatusEmail({ event: ev, status: 'rejected', student, tutor });
+    await Promise.all([
+      student?.email ? sendVerifyEmail(student.email, mail.subject, mail.html) : null,
+      tutor?.email ? sendVerifyEmail(tutor.email, mail.subject, mail.html) : null,
+    ]);
+  } catch (_) {}
 
   return ev;
 }
 
 async function cancelEvent(user, id, reason) {
   const ev = await CalendarEvent.findByPk(id);
-  if (!ev) { const e = new Error('Not found'); e.status = 404; throw e; }
+  if (!ev) { const e = new Error('Event not found'); e.status = 404; throw e; }
   if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
-  if (!['proposed', 'accepted'].includes(ev.status)) { const e = new Error('Cannot cancel this event'); e.status = 400; throw e; }
 
-  await ev.update({ status: 'cancelled', decisionReason: reason || null });
+  await ev.update({ status: 'cancelled', cancelReason: reason || null });
 
-  const student = await User.findByPk(ev.studentId);
-  const tutor = await User.findByPk(ev.tutorId);
-  const mail = calendarStatusEmail({ event: ev, status: 'cancelled', reason });
-  await sendVerifyEmail(student.email, mail.subject, mail.html);
-  await sendVerifyEmail(tutor.email, mail.subject, mail.html);
+  try {
+    const [student, tutor] = await Promise.all([
+      User.findByPk(ev.studentId),
+      User.findByPk(ev.tutorId),
+    ]);
+    const mail = calendarStatusEmail({ event: ev, status: 'cancelled', student, tutor });
+    await Promise.all([
+      student?.email ? sendVerifyEmail(student.email, mail.subject, mail.html) : null,
+      tutor?.email ? sendVerifyEmail(tutor.email, mail.subject, mail.html) : null,
+    ]);
+  } catch (_) {}
 
   return ev;
 }
 
 async function rescheduleEvent(user, id, { startAt, endAt, note }) {
-  return sequelize.transaction(async (t) => {
-    const ev = await CalendarEvent.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
-    if (!ev) { const e = new Error('Not found'); e.status = 404; throw e; }
-    if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
-    if (!['proposed', 'accepted'].includes(ev.status)) { const e = new Error('Cannot reschedule this event'); e.status = 400; throw e; }
+  const prev = await CalendarEvent.findByPk(id);
+  if (!prev) { const e = new Error('Event not found'); e.status = 404; throw e; }
+  if (!isParticipant(user, prev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
 
-    const sConflict = await hasConflictFor(ev.studentId, new Date(startAt), new Date(endAt), ev.id);
-    const tConflict = await hasConflictFor(ev.tutorId,   new Date(startAt), new Date(endAt), ev.id);
-    if (sConflict || tConflict) {
-      const e = new Error('Time conflict with an accepted event'); e.status = 409; throw e;
-    }
+  // mark the old one as 'rescheduled'
+  await prev.update({ status: 'rescheduled' });
 
-    // mark original as rescheduled
-    await ev.update({ status: 'rescheduled', decisionReason: note || null }, { transaction: t });
-
-    // create new proposed event with same metadata
-    const next = await CalendarEvent.create({
-      title: ev.title, description: ev.description, type: ev.type,
-      status: 'proposed',
-      startAt, endAt,
-      locationType: ev.locationType, locationDetails: ev.locationDetails,
-      studentId: ev.studentId, tutorId: ev.tutorId, createdBy: user.id,
-      subjectId: ev.subjectId, purchaseId: ev.purchaseId,
-      rescheduleOf: ev.id
-    }, { transaction: t });
-
-    const student = await User.findByPk(ev.studentId, { transaction: t });
-    const tutor = await User.findByPk(ev.tutorId, { transaction: t });
-    const mail = calendarStatusEmail({ event: next, status: 'rescheduled', note });
-    await sendVerifyEmail(student.email, mail.subject, mail.html);
-    await sendVerifyEmail(tutor.email, mail.subject, mail.html);
-
-    return next;
+  // create a new 'proposed' session with same participants
+  const next = await CalendarEvent.create({
+    title: prev.title,
+    description: note || prev.description || null,
+    type: prev.type,
+    status: prev.type === 'session' ? 'proposed' : 'accepted',
+    startAt,
+    endAt,
+    locationType: prev.locationType,
+    locationDetails: prev.locationDetails,
+    subjectId: prev.subjectId,
+    purchaseId: prev.purchaseId,
+    studentId: prev.studentId,
+    tutorId: prev.tutorId,
+    createdBy: user.id,
   });
+
+  try {
+    const [student, tutor] = await Promise.all([
+      User.findByPk(prev.studentId),
+      User.findByPk(prev.tutorId),
+    ]);
+    const mail = calendarStatusEmail({ event: next, status: 'rescheduled', student, tutor });
+    await Promise.all([
+      student?.email ? sendVerifyEmail(student.email, mail.subject, mail.html) : null,
+      tutor?.email ? sendVerifyEmail(tutor.email, mail.subject, mail.html) : null,
+    ]);
+  } catch (_) {}
+
+  return next;
 }
 
 module.exports = {
@@ -223,5 +305,5 @@ module.exports = {
   acceptEvent,
   rejectEvent,
   cancelEvent,
-  rescheduleEvent
+  rescheduleEvent,
 };

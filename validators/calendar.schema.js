@@ -1,52 +1,47 @@
 // validators/calendar.schema.js
 const Joi = require('joi');
 
-const base = {
-  title: Joi.string().trim().max(150).allow('', null),
-  description: Joi.string().allow('', null),
-  type: Joi.string().valid('session', 'exam', 'target', 'other').default('session'),
-  startAt: Joi.date().iso().required(),
-  endAt: Joi.date().iso().required(),
-  locationType: Joi.string().valid('online', 'in-person').allow(null),
-  locationDetails: Joi.string().trim().max(300).allow('', null),
-  subjectId: Joi.string().uuid().allow(null),
-  purchaseId: Joi.string().uuid().allow(null),
-
-  // One of these can be omitted based on caller role; service will fill/validate.
-  studentId: Joi.string().uuid().optional(),
-  tutorId: Joi.string().uuid().optional()
-};
-
-const createEvent = Joi.object(base).custom((val, helpers) => {
-  if (new Date(val.endAt) <= new Date(val.startAt)) {
-    return helpers.error('any.invalid', { message: 'endAt must be after startAt' });
-  }
-  return val;
-}, 'time ordering');
+const idParam = Joi.object({
+  id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).required(),
+});
 
 const listQuery = Joi.object({
+  role: Joi.string().valid('student', 'tutor', 'admin').optional(),
   from: Joi.date().iso().optional(),
   to: Joi.date().iso().optional(),
-  studentId: Joi.string().uuid().optional(), // admin can filter
-  tutorId: Joi.string().uuid().optional(),
-  status: Joi.string().valid('proposed', 'accepted', 'rejected', 'cancelled', 'rescheduled').optional()
-});
+  studentId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).optional(),
+  tutorId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).optional(),
+}).unknown(false);
+
+const createEvent = Joi.object({
+  title: Joi.string().allow(null, '').optional(),
+  description: Joi.string().allow(null, '').optional(),
+  type: Joi.string().valid('session', 'exam', 'target').default('session'),
+  startAt: Joi.date().iso().required(),
+  endAt: Joi.date().iso().required(),
+  locationType: Joi.string().valid('online', 'in-person').optional(),
+  locationDetails: Joi.string().allow(null, '').optional(),
+  subjectId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
+  purchaseId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
+  // role-derived:
+  studentId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).optional(),
+  tutorId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).optional(),
+}).unknown(false);
 
 const reasonBody = Joi.object({
-  reason: Joi.string().trim().min(3).max(500).required()
-});
+  reason: Joi.string().allow(null, '').optional(),
+}).unknown(false);
 
 const rescheduleBody = Joi.object({
   startAt: Joi.date().iso().required(),
   endAt: Joi.date().iso().required(),
-  note: Joi.string().trim().max(500).allow('', null)
-}).custom((val, helpers) => {
-  if (new Date(val.endAt) <= new Date(val.startAt)) {
-    return helpers.error('any.invalid', { message: 'endAt must be after startAt' });
-  }
-  return val;
-}, 'time ordering');
+  note: Joi.string().allow(null, '').optional(),
+}).unknown(false);
 
-const idParam = Joi.object({ id: Joi.string().uuid().required() });
-
-module.exports = { createEvent, listQuery, reasonBody, rescheduleBody, idParam };
+module.exports = {
+  idParam,
+  listQuery,
+  createEvent,
+  reasonBody,
+  rescheduleBody,
+};
