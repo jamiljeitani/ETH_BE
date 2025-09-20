@@ -67,11 +67,11 @@ async function updateAvatar(userId, avatarUrl) {
   // Update or create student profile with avatar URL
   const [profile] = await StudentProfile.findOrCreate({
     where: { userId },
-    defaults: { userId, pictureUrl: avatarUrl }
+    defaults: { userId, profilePictureUrl: avatarUrl }
   });
 
   if (profile.pictureUrl !== avatarUrl) {
-    await profile.update({ pictureUrl: avatarUrl });
+    await profile.update({ profilePictureUrl: avatarUrl });
   }
 
   // Also update the user's main profile picture URL for navbar display

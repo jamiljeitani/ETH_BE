@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     school: { type: DataTypes.STRING, allowNull: false },
     gradeId: { type: DataTypes.UUID, allowNull: false },
 
-    profilePictureUrl: { type: DataTypes.STRING, allowNull: true },
+    profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
     notes: { type: DataTypes.TEXT, allowNull: true }
   }, {
     tableName: 'student_profiles',

@@ -16,8 +16,8 @@ module.exports = (sequelize, DataTypes) => {
     payoutMethod: { type: DataTypes.STRING, allowNull: false },
 
     rankId: { type: DataTypes.UUID, allowNull: true }, // TutorRank
-    idDocumentUrl: { type: DataTypes.STRING, allowNull: true },
-    profilePictureUrl: { type: DataTypes.STRING, allowNull: true },
+    idDocumentUrl: { type: DataTypes.STRING, allowNull: false },
+    profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
 
     preferredGradesText: { type: DataTypes.STRING, allowNull: true }
   }, {

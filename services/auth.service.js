@@ -1,6 +1,6 @@
 // services/auth.service.js
 const dayjs = require('dayjs');
-const { User, EmailVerification, PasswordResetToken } = require('../models');
+const { User,StudentProfile,TutorProfile, EmailVerification, PasswordResetToken } = require('../models');
 const { hashPassword, comparePassword, randomToken } = require('../utils/crypto');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { verifyEmailTemplate, resetPasswordTemplate } = require('../utils/emailTemplates');
@@ -10,16 +10,18 @@ const { ROLES, USER_STATUS } = require('../utils/constants');
 const VERIFY_EXPIRES_HOURS = 24;
 const RESET_EXPIRES_HOURS = 1;
 
-function sanitizeUser(u) {
-  return {
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    status: u.status,
-    emailVerifiedAt: u.emailVerifiedAt,
-    preferredLanguage: u.preferredLanguage || 'en',
-    createdAt: u.createdAt
-  };
+function sanitizeUser(u, extras = {}) {
+    return {
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        emailVerifiedAt: u.emailVerifiedAt,
+        preferredLanguage: u.preferredLanguage || 'en',
+        createdAt: u.createdAt,
+        profilePictureUrl: extras.profilePictureUrl ?? null,
+        idDocumentUrl: extras.idDocumentUrl ?? null,
+    };
 }
 
 async function signup({ email, password, role }) {
@@ -147,9 +149,32 @@ async function getUserPreferences(userId) {
 }
 
 async function getUserById(userId) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
-  return sanitizeUser(user);
+    const user = await User.findByPk(userId);
+    if (!user) {
+        const e = new Error('User not found');
+        e.status = 404;
+        throw e;
+    }
+
+    // Attach profile fields based on role
+    let profilePictureUrl = null;
+    let idDocumentUrl = null;
+
+    if (user.role === 'student') {
+        const sp = await StudentProfile.findOne({ where: { userId: user.id } });
+        if (sp) {
+            profilePictureUrl = sp.profilePictureUrl || null;
+            // students don’t have idDocumentUrl by design; keep null
+        }
+    } else if (user.role === 'tutor') {
+        const tp = await TutorProfile.findOne({ where: { userId: user.id } });
+        if (tp) {
+            profilePictureUrl = tp.profilePictureUrl || null;
+            idDocumentUrl = tp.idDocumentUrl || null;
+        }
+    }
+
+    return sanitizeUser(user, { profilePictureUrl, idDocumentUrl });
 }
 
 module.exports = { signup, verifyEmail, login, refresh, forgotPassword, resetPassword, updateUserPreferences, getUserPreferences, getUserById };
