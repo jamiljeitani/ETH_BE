@@ -234,9 +234,13 @@ router.get("/dashboard/recent-tutors", ensureCtrl("getRecentTutors"));
 
 /* ---------- Tutor Ranks analytics & assignment ---------- */
 router.get("/tutor-ranks/usage", ensureCtrl("getTutorRankUsage"));
-router.patch("/tutors/:id/rank",
+router.patch(
+  "/tutors/:id/rank",
   safeValidate(adminSchema.idParam, "params"),
+  safeValidate(adminSchema.assignRankBody, "body"),
   ensureCtrl("assignTutorRank")
 );
+
+
 
 module.exports = router;

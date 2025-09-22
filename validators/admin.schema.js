@@ -4,8 +4,7 @@ const Joi = require('joi');
 // Params
 const idParam = Joi.object({ id: Joi.string().uuid().required() });
 
-
-// Simple name entities (Subject, Grade, BacType)
+// Simple name entities (Subject, Grade)
 const nameCreate = Joi.object({ name: Joi.string().trim().min(2).max(120).required() });
 const nameUpdate = Joi.object({ name: Joi.string().trim().min(2).max(120).optional() });
 
@@ -45,6 +44,16 @@ const updateSessionType = Joi.object({
   isActive: Joi.boolean().optional()
 });
 
+// ---- FIX: BacType (allow description) ----
+const createBacType = Joi.object({
+  name: Joi.string().trim().min(2).max(120).required(),
+  description: Joi.string().allow('', null).optional()
+});
+const updateBacType = Joi.object({
+  name: Joi.string().trim().min(2).max(120).optional(),
+  description: Joi.string().allow('', null).optional()
+});
+
 // Bundles
 const bundleItem = Joi.object({
   sessionTypeId: Joi.string().uuid().required(),
@@ -60,32 +69,36 @@ const updateBundle = Joi.object({
   name: Joi.string().trim().min(2).max(150).optional(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().optional(),
-  items: Joi.array().items(bundleItem).min(1).optional() // replace if provided
+  items: Joi.array().items(bundleItem).min(1).optional()
 });
 
+// Assignments
 const createAssignment = Joi.object({
   studentId: Joi.string().uuid().required(),
   tutorId: Joi.string().uuid().required(),
   purchaseId: Joi.string().uuid().required(),
   notes: Joi.string().max(300).allow('', null)
 });
-
 const queryAssignments = Joi.object({
   studentId: Joi.string().uuid().optional(),
   tutorId: Joi.string().uuid().optional(),
   purchaseId: Joi.string().uuid().optional()
 });
+const updateAssignment = Joi.object({
+  tutorId: Joi.string().uuid().optional(),
+  notes: Joi.string().max(300).allow('', null)
+});
 
+// Change Requests
 const decisionChangeRequest = Joi.object({
   action: Joi.string().valid('approve', 'reject').required(),
   resolutionNote: Joi.string().max(500).allow('', null)
 });
-
 const idParamChangeReq = Joi.object({
   id: Joi.string().uuid().required()
 });
 
-// NEW: admin feedback list query
+// Admin feedback list query
 const feedbackListQuery = Joi.object({
   sessionId: Joi.string().uuid().optional(),
   studentId: Joi.string().uuid().optional(),
@@ -94,29 +107,33 @@ const feedbackListQuery = Joi.object({
   to: Joi.date().iso().optional()
 });
 
-
-const updateAssignment = Joi.object({
-  tutorId: Joi.string().uuid().optional(),
-  notes: Joi.string().max(300).allow('', null),
-});
-
-
-
+// Optional: export aliases so admin.routes.js keys stay strict
+const createSession = createSessionType;
+const updateSession = updateSessionType;
 
 module.exports = {
   idParam,
-  // simple name entities
+
+  // simple name entities (no description): Subject, Grade
   createSubject: nameCreate, updateSubject: nameUpdate,
   createGrade: nameCreate,   updateGrade: nameUpdate,
-  createBacType: nameCreate, updateBacType: nameUpdate,
+
+  // ---- BacType with description ----
+  createBacType, updateBacType,
+
   // language & rank
   createLanguage, updateLanguage,
   createTutorRank, updateTutorRank,
+
   // sessions & bundles
   createSessionType, updateSessionType,
+  createSession, updateSession, // aliases for routes that use these keys
   createBundle, updateBundle,
+
   // assignments & change requests
   createAssignment, updateAssignment, queryAssignments,
   decisionChangeRequest, idParamChangeReq,
+
+  // feedback
   feedbackListQuery
 };
