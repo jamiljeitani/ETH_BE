@@ -69,8 +69,8 @@ async function getConsumptionReport({ from, to, studentId, tutorId, page = 1, li
     const periodMinutes = (await Consumption.sum('minutes', { where: consWhere })) || 0;
 
     // Overall/remaining from purchase cached fields
-    const purchasedMinutesTotal = Number(p.hoursPurchased) * 60;
-    const consumedMinutesOverall = Number(p.hoursConsumed) * 60;
+    const purchasedMinutesTotal = Number(p.sessionsPurchased) * 60;
+    const consumedMinutesOverall = Number(p.sessionsConsumed) * 60;
     const remainingMinutes = Math.max(0, purchasedMinutesTotal - consumedMinutesOverall);
 
     // Tutor (from current assignment, one-per-purchase)
@@ -99,8 +99,8 @@ async function getConsumptionReport({ from, to, studentId, tutorId, page = 1, li
       product: p.bundle
         ? { type: 'bundle', id: p.bundle.id, name: p.bundle.name }
         : { type: 'sessionType', id: p.sessionType?.id || null, name: p.sessionType?.name || null, hourlyRate: p.sessionType?.hourlyRate || null },
-      hoursPurchased: Number(p.hoursPurchased),
-      hoursConsumedOverall: Number(p.hoursConsumed),
+      sessionsPurchased: Number(p.sessionsPurchased),
+      hoursConsumedOverall: Number(p.sessionsConsumed),
       purchasedMinutesTotal,
       consumedMinutesOverall,
       remainingMinutes,

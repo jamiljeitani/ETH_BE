@@ -22,7 +22,7 @@ function resetPasswordTemplate({ token }) {
 
 function purchaseConfirmationEmail({ purchase }) {
   const kind = purchase.bundle ? `Bundle: ${purchase.bundle.name}` :
-    `Custom: ${purchase.sessionType?.name} (${purchase.hoursPurchased}h)`;
+    `Custom: ${purchase.sessionType?.name} (${purchase.sessionsPurchased}h)`;
   return {
     subject: 'Purchase confirmed — a tutor will be assigned shortly',
     html: `
@@ -30,7 +30,7 @@ function purchaseConfirmationEmail({ purchase }) {
       <ul>
         <li><strong>Type:</strong> ${kind}</li>
         <li><strong>Start date:</strong> ${new Date(purchase.startDate).toLocaleString()}</li>
-        <li><strong>Hours:</strong> ${purchase.hoursPurchased}</li>
+        <li><strong>Hours:</strong> ${purchase.sessionsPurchased}</li>
         <li><strong>Amount:</strong> ${purchase.amount} ${purchase.currency}</li>
       </ul>
       <p>A tutor will be assigned to you shortly. We will keep you posted.</p>
@@ -40,7 +40,7 @@ function purchaseConfirmationEmail({ purchase }) {
 
 function pendingReviewEmail({ purchase }) {
   const kind = purchase.bundle ? `Bundle: ${purchase.bundle.name}` :
-    `Custom: ${purchase.sessionType?.name} (${purchase.hoursPurchased}h)`;
+    `Custom: ${purchase.sessionType?.name} (${purchase.sessionsPurchased}h)`;
   return {
     subject: 'Payment received — pending review',
     html: `
@@ -63,7 +63,7 @@ function assignmentStudentEmail({ purchase, tutor }) {
       <ul>
         <li><strong>Tutor:</strong> ${tutor.email}</li>
         <li><strong>Start date:</strong> ${new Date(purchase.startDate).toLocaleString()}</li>
-        <li><strong>Hours:</strong> ${purchase.hoursPurchased}</li>
+        <li><strong>Hours:</strong> ${purchase.sessionsPurchased}</li>
       </ul>
       <p>You can coordinate sessions from your schedule page.</p>
     `
@@ -78,7 +78,7 @@ function assignmentTutorEmail({ purchase, student }) {
       <ul>
         <li><strong>Student:</strong> ${student.email}</li>
         <li><strong>Start date:</strong> ${new Date(purchase.startDate).toLocaleString()}</li>
-        <li><strong>Hours:</strong> ${purchase.hoursPurchased}</li>
+        <li><strong>Hours:</strong> ${purchase.sessionsPurchased}</li>
       </ul>
       <p>Please propose initial session times in the calendar.</p>
     `

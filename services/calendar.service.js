@@ -338,8 +338,8 @@ async function createRecurringEvents(user, body) {
 
     // Simple affordability (optional)
     const totalNeededMinutes = durationMinutes * count;
-    const purchasedMin = Number(purchase.hoursPurchased || 0) * 60;
-    const consumedMin  = Number(purchase.hoursConsumed  || 0) * 60;
+    const purchasedMin = Number(purchase.sessionsPurchased || 0) * 60;
+    const consumedMin  = Number(purchase.sessionsConsumed  || 0) * 60;
     const remainingMin = Math.max(0, purchasedMin - consumedMin);
     if (remainingMin < durationMinutes) {
         const e = new Error('Not enough remaining minutes to start a series.');

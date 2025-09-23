@@ -23,7 +23,7 @@ async function computeBundleHoursAndAmount(bundleId) {
       amount += it.hours * Number(it.sessionType.hourlyRate);
     }
   }
-  return { hoursPurchased: hours, amount: toAmount(amount), bundle };
+  return { sessionsPurchased: hours, amount: toAmount(amount), bundle };
 }
 
 async function computeCustomHoursAndAmount(sessionTypeId, hours) {
@@ -32,7 +32,7 @@ async function computeCustomHoursAndAmount(sessionTypeId, hours) {
   if (!Number.isInteger(hours) || hours < 1) { const e = new Error('Invalid hours'); e.status = 400; throw e; }
 
   const amount = toAmount(hours * Number(st.hourlyRate));
-  return { hoursPurchased: hours, amount, sessionType: st };
+  return { sessionsPurchased: hours, amount, sessionType: st };
 }
 
 async function createPurchase(studentId, payload) {
@@ -43,22 +43,22 @@ async function createPurchase(studentId, payload) {
   }
 
   return sequelize.transaction(async (t) => {
-    let hoursPurchased = 0;
+    let sessionsPurchased = 0;
     let amount = 0;
 
     if (bundleId) {
       const calc = await computeBundleHoursAndAmount(bundleId);
-      hoursPurchased = calc.hoursPurchased;
+      sessionsPurchased = calc.sessionsPurchased;
       amount = calc.amount;
     } else {
       const calc = await computeCustomHoursAndAmount(sessionTypeId, hours);
-      hoursPurchased = calc.hoursPurchased;
+      sessionsPurchased = calc.sessionsPurchased;
       amount = calc.amount;
     }
 
     const purchase = await Purchase.create({
       studentId, bundleId: bundleId || null, sessionTypeId: sessionTypeId || null,
-      hoursPurchased, startDate: dayjs(startDate).toDate(),
+      sessionsPurchased: sessionsPurchased, startDate: dayjs(startDate).toDate(),
       status: 'pending', amount, currency
     }, { transaction: t });
 

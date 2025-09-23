@@ -32,14 +32,14 @@ const updateTutorRank = Joi.object({
 const createSessionType = Joi.object({
   name: Joi.string().trim().min(2).max(150).required(),
   hourlyRate: Joi.number().precision(2).positive().required(),
-  hoursPerWeek: Joi.number().integer().min(1).max(40).optional(),
+  sessionHours: Joi.number().integer().min(1).max(40).optional(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().optional()
 });
 const updateSessionType = Joi.object({
   name: Joi.string().trim().min(2).max(150).optional(),
   hourlyRate: Joi.number().precision(2).positive().optional(),
-  hoursPerWeek: Joi.number().integer().min(1).max(40).optional(),
+  sessionHours: Joi.number().integer().min(1).max(40).optional(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().optional()
 });

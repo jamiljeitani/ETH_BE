@@ -37,7 +37,7 @@ function describePurchaseForStripe(purchase) {
   }
   if (purchase.sessionType) {
     const name = `Session: ${purchase.sessionType.name}`;
-    const desc = `${purchase.hoursPurchased}h @ ${purchase.sessionType.hourlyRate}/h`;
+    const desc = `${purchase.sessionsPurchased}h @ ${purchase.sessionType.hourlyRate}/h`;
     return { name, description: desc };
   }
   return { name: 'Tutoring Purchase', description: '' };

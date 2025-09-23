@@ -23,7 +23,7 @@ async function effectiveRatePerHour(purchase, t) {
     const st = await SessionType.findByPk(purchase.sessionTypeId, { transaction: t });
     if (st?.rate != null) return Number(st.rate);
   }
-  const hours = Number(purchase.hoursPurchased || 0);
+  const hours = Number(purchase.sessionsPurchased || 0);
   if (hours > 0 && purchase.amount != null) return Number(purchase.amount) / hours;
   return Number(purchase.rate || 0);
 }
@@ -116,9 +116,9 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
 
   // remaining balance
   const totalBalMin = (typeof purchase.minutesTotal === 'number' ? purchase.minutesTotal
-                      : Number(purchase.hoursPurchased || 0) * 60);
+                      : Number(purchase.sessionsPurchased || 0) * 60);
   const consumedMin = (typeof purchase.minutesConsumed === 'number' ? purchase.minutesConsumed
-                      : Number(purchase.hoursConsumed || 0) * 60);
+                      : Number(purchase.sessionsConsumed || 0) * 60);
   const remainingMin = Math.max(0, totalBalMin - consumedMin);
 
   const billable = Math.min(totalMinutes, remainingMin);
@@ -128,9 +128,9 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
   const updates = {};
   if ('minutesConsumed' in purchase) updates.minutesConsumed =
     isIntCol(Purchase,'minutesConsumed') ? (consumedMin + billable) : Number(consumedMin + billable);
-  if ('hoursConsumed' in purchase) {
+  if ('sessionsConsumed' in purchase) {
     const h = (consumedMin + billable) / 60;
-    updates.hoursConsumed = isIntCol(Purchase,'hoursConsumed') ? Math.floor(h) : Number(h.toFixed(2));
+    updates.sessionsConsumed = isIntCol(Purchase,'sessionsConsumed') ? Math.floor(h) : Number(h.toFixed(2));
   }
   if ('minutesRemaining' in purchase) updates.minutesRemaining =
     isIntCol(Purchase,'minutesRemaining') ? Math.max(0, remainingMin - billable) : Number(Math.max(0, remainingMin - billable));
@@ -239,8 +239,8 @@ exports.listAssignedPurchases = async (user) => {
 
   return assigns.map(a => {
     const p = a.purchase || {};
-    const totalMin = (typeof p.minutesTotal === 'number') ? p.minutesTotal : Number(p.hoursPurchased || 0) * 60;
-    const consumedMin = (typeof p.minutesConsumed === 'number') ? p.minutesConsumed : Number(p.hoursConsumed || 0) * 60;
+    const totalMin = (typeof p.minutesTotal === 'number') ? p.minutesTotal : Number(p.sessionsPurchased || 0) * 60;
+    const consumedMin = (typeof p.minutesConsumed === 'number') ? p.minutesConsumed : Number(p.sessionsConsumed || 0) * 60;
     const remaining = Math.max(0, totalMin - consumedMin);
 
     return {

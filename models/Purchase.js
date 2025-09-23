@@ -7,8 +7,8 @@ module.exports = (sequelize, DataTypes) => {
     bundleId: { type: DataTypes.UUID, allowNull: true },   // -> bundles.id
     sessionTypeId: { type: DataTypes.UUID, allowNull: true }, // -> session_types.id
 
-    hoursPurchased: { type: DataTypes.INTEGER, allowNull: false },
-    hoursConsumed: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    sessionsPurchased: { type: DataTypes.INTEGER, allowNull: false },
+    sessionsConsumed: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 
     startDate: { type: DataTypes.DATE, allowNull: false },
     status: {
