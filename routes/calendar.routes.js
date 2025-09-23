@@ -15,5 +15,7 @@ router.patch('/events/:id/accept', validate(schema.idParam, 'params'), ctrl.acce
 router.patch('/events/:id/reject', validate(schema.idParam, 'params'), validate(schema.reasonBody), ctrl.reject);
 router.patch('/events/:id/cancel', validate(schema.idParam, 'params'), validate(schema.reasonBody), ctrl.cancel);
 router.patch('/events/:id/reschedule', validate(schema.idParam, 'params'), validate(schema.rescheduleBody), ctrl.reschedule);
+router.post('/events/series', validate(schema.createRecurring), ctrl.createSeries);
+
 
 module.exports = router;

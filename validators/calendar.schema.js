@@ -38,10 +38,26 @@ const rescheduleBody = Joi.object({
   note: Joi.string().allow(null, '').optional(),
 }).unknown(false);
 
+const createRecurring = Joi.object({
+    // one-off event template
+    title: Joi.string().allow('', null),
+    description: Joi.string().allow('', null),
+    subjectId: Joi.string().guid({ version: 'uuidv4' }).allow(null),
+    purchaseId: Joi.string().guid({ version: 'uuidv4' }).required(),
+
+    // recurrence inputs
+    startAt: Joi.date().iso().required(),        // first occurrence start
+    durationMinutes: Joi.number().integer().min(15).max(240).required(),
+    count: Joi.number().integer().min(1).max(30).required(),   // e.g., 5
+    // weekly by default; if you want more later, extend with 'freq', 'interval'
+}).unknown(false);
+
+
 module.exports = {
   idParam,
   listQuery,
   createEvent,
   reasonBody,
   rescheduleBody,
+  createRecurring
 };

@@ -43,4 +43,11 @@ async function reschedule(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { list, create, accept, reject, cancel, reschedule };
+async function createSeries(req, res, next) {
+    try {
+        const evts = await svc.createRecurringEvents(req.user, req.body);
+        res.status(201).json({ events: evts, message: 'Series proposed.' });
+    } catch (e) { next(e); }
+}
+
+module.exports = { list, create, accept, reject, cancel, reschedule, createSeries };
