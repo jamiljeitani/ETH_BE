@@ -27,6 +27,9 @@ router.use('/calendar', authGuard, require('./calendar.routes'));
 router.use('/sessions', authGuard, requireRole('tutor'), require('./sessions.routes')); // timer endpoints are tutor-only
 router.use('/feedback', authGuard, require('./feedback.routes')); // both roles can POST
 
+// Support messages
+router.use('/support', require('./support.routes'));
+
 router.get('/health', (req, res) => res.json({ ok: true }));
 
 module.exports = router;

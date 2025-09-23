@@ -49,6 +49,8 @@ db.Consumption = require('./Consumption')(sequelize, Sequelize.DataTypes);
 db.Timesheet = require('./Timesheet')(sequelize, Sequelize.DataTypes);
 db.Feedback = require('./Feedback')(sequelize, Sequelize.DataTypes);
 
+db.SupportMessage = require('./SupportMessage')(sequelize, Sequelize.DataTypes);
+
 
 // Associations (Phase 1)
 db.User.hasMany(db.EmailVerification, { foreignKey: 'userId', as: 'emailVerifications', onDelete: 'CASCADE' });
@@ -161,5 +163,9 @@ db.Timesheet.belongsTo(db.Session, { foreignKey: 'sessionId', as: 'session' });
 // Feedback
 db.Feedback.belongsTo(db.Session, { foreignKey: 'sessionId', as: 'session' });
 db.Feedback.belongsTo(db.User, { foreignKey: 'byUserId', as: 'byUser' });
+
+// Support messages
+db.User.hasMany(db.SupportMessage, { foreignKey: 'userId', as: 'supportMessages', onDelete: 'CASCADE' });
+db.SupportMessage.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
 
 module.exports = db;
