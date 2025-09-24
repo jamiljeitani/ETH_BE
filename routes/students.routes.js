@@ -14,7 +14,8 @@ router.get('/me', ctrl.getMe);
 router.put('/me', validate(schema.putMe), ctrl.putMe);
 
 // Avatar upload endpoint (memory upload -> ImageKit)
-router.post('/me/avatar', uploadMemory.single('file'), ctrl.uploadAvatar);
+router.post('/me/avatar', uploadMemory.single('file'), ctrl.uploadAvatarOnlyUrl);
+
 
 // Tutor change requests (student)
 router.post('/tutor-change-requests', validate(schema.createTutorChangeRequest), ctrl.createTutorChangeRequest);

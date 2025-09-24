@@ -1,8 +1,9 @@
 // services/tutor.service.js
 const {
   sequelize, User, TutorProfile, TutorRank, Language, Subject, BacType,
-  Assignment, StudentProfile, SessionType, Bundle, Purchase
+  Assignment, StudentProfile, SessionType, Bundle, CalendarEvent
 } = require('../models');
+const {Op} = require("sequelize");
 
 const includeTree = [
   { model: TutorRank, as: 'rank' },
@@ -93,84 +94,114 @@ async function listAssignedStudents(tutorUserId) {
   return out;
 }
 
-/** NEW: full assignments (student + purchase label) for this tutor */
+const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
+// Uses SessionType.sessionHours for duration; counts come from Purchase
+function computeSessionStats(pJSON) {
+    if (!pJSON) {
+        return {
+            sessionsPurchased: null,
+            sessionsConsumed: null,
+            sessionsRemaining: null,
+            sessionDurationMinutes: 60,
+            sessionHours: 1,
+        };
+    }
+
+    const st = pJSON.sessionType || {};
+    const sessionHours = toNum(st.sessionHours) ?? 1;      // default 1 hour if missing
+    const sessionDurationMinutes = sessionHours * 60;
+
+    const sessionsPurchased = toNum(pJSON.sessionsPurchased) ?? 0;
+    const sessionsConsumed  = toNum(pJSON.sessionsConsumed)  ?? 0;
+    const sessionsRemaining = Math.max(0, sessionsPurchased - sessionsConsumed);
+
+    return { sessionsPurchased, sessionsConsumed, sessionsRemaining, sessionDurationMinutes, sessionHours };
+}
+
 async function listAssignmentsDetailed(tutorUserId) {
-  const rows = await Assignment.findAll({
-    where: { tutorId: tutorUserId },
-    include: [
-      {
-        association: 'student',
-        attributes: ['id', 'email'],
-        include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }]
-      },
-      {
-        association: 'purchase',
+    const rows = await Assignment.findAll({
+        where: { tutorId: tutorUserId },
         include: [
-          { model: SessionType, as: 'sessionType', attributes: ['name', 'hourlyRate'] },
-          { model: Bundle, as: 'bundle', attributes: ['name'] },
+            {
+                association: 'student',
+                attributes: ['id', 'email'],
+                include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }],
+            },
+            {
+                association: 'purchase',
+                required: false,
+                attributes: { exclude: [] }, // all purchase fields
+                include: [
+                    { model: SessionType, as: 'sessionType', attributes: { exclude: [] } },
+                    { model: Bundle, as: 'bundle', attributes: { exclude: [] } },
+
+                    // ⭐ NEW: grab scheduled (non-cancelled) events for this purchase
+                    {
+                        model: CalendarEvent,
+                        as: 'calendarEvents',
+                        attributes: ['id'],
+                        required: false,
+                        where: {
+                            status: { [Op.notIn]: ['cancelled', 'rejected'] }
+                        },
+                        separate: true,
+                    },
+                ],
+            },
         ],
-      },
-    ],
-    order: [['createdAt', 'DESC']],
-  });
+        order: [['createdAt', 'DESC']],
+    });
 
-  return rows.map(a => ({
-    id: a.id,
-    student: {
-      id: a.student?.id,
-      email: a.student?.email,
-      fullName: a.student?.studentProfile?.fullName || a.student?.email,
-    },
-    purchase: a.purchase ? {
-      id: a.purchase.id,
-      hours: a.purchase.hours,
-      status: a.purchase.status,
-      displayName: a.purchase?.bundleId
-        ? `${a.purchase?.bundle?.name || 'Bundle'} (${a.purchase?.hours}h)`
-        : `${a.purchase?.sessionType?.name || 'Session'} (${a.purchase?.hours}h)`,
-      sessionType: a.purchase?.sessionType ? { name: a.purchase.sessionType.name } : undefined,
-      bundle: a.purchase?.bundle ? { name: a.purchase.bundle.name } : undefined,
-    } : null,
-  }));
-}
+    return rows.map(a => {
+        const p = a.purchase;
+        const pJSON = p?.toJSON ? p.toJSON() : p || null;
 
-async function updateAvatar(userId, avatarUrl) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
+        const stats = computeSessionStats(pJSON); // your existing helper
+        const scheduledCount = Array.isArray(pJSON?.calendarEvents) ? pJSON.calendarEvents.length : 0;
 
-  const [profile] = await TutorProfile.findOrCreate({
-    where: { userId },
-    defaults: { userId, profilePictureUrl: avatarUrl }
-  });
+        // sessionsRemaining is what’s not yet consumed; we also subtract scheduled-but-not-done
+        const sessionsRemaining = stats.sessionsRemaining ?? Math.max((stats.sessionsPurchased || 0) - (stats.sessionsConsumed || 0), 0);
+        const schedulingLimitRemaining = Math.max(sessionsRemaining - scheduledCount, 0);
 
-  if (profile.profilePictureUrl !== avatarUrl) {
-    await profile.update({ profilePictureUrl: avatarUrl });
-  }
+        return {
+            id: a.id,
+            student: {
+                id: a.student?.id,
+                email: a.student?.email,
+                fullName: a.student?.studentProfile?.fullName || a.student?.email,
+            },
+            purchase: pJSON
+                ? {
+                    ...pJSON, // keep all purchase columns & nested associations
+                    sessionType: pJSON.sessionType || null,
+                    bundle: pJSON.bundle || null,
 
-  await user.update({ profilePictureUrl: avatarUrl });
-  return getMe(userId);
-}
+                    // original computed stats
+                    sessionsPurchased: stats.sessionsPurchased,
+                    sessionsConsumed:  stats.sessionsConsumed,
+                    sessionsRemaining, // keep this aligned with your computeSessionStats
 
-async function updateIdDocument(userId, documentUrl) {
-  const user = await User.findByPk(userId);
-  if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
+                    // handy helpers
+                    sessionDurationMinutes: stats.sessionDurationMinutes,
+                    sessionHours: stats.sessionHours,
 
-  const [profile] = await TutorProfile.findOrCreate({
-    where: { userId },
-    defaults: { userId, idDocumentUrl: documentUrl }
-  });
-
-  if (profile.idDocumentUrl !== documentUrl) {
-    await profile.update({ idDocumentUrl: documentUrl });
-  }
-  return getMe(userId);
+                    // ⭐ NEW: scheduling constraints
+                    scheduledCount,                 // how many non-cancelled events are already on the calendar
+                    schedulingLimitRemaining,       // how many more sessions can be scheduled
+                    canScheduleAnotherSession: schedulingLimitRemaining > 0,
+                }
+                : null,
+        };
+    });
 }
 
 module.exports = {
   getMe,
   upsertMe,
   listAssignedStudents,
-  listAssignmentsDetailed, 
-  updateAvatar,
-  updateIdDocument
+  listAssignmentsDetailed
 };

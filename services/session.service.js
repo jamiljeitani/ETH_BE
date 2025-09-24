@@ -242,11 +242,15 @@ exports.listAssignedPurchases = async (user) => {
     const totalMin = (typeof p.minutesTotal === 'number') ? p.minutesTotal : Number(p.sessionsPurchased || 0) * 60;
     const consumedMin = (typeof p.minutesConsumed === 'number') ? p.minutesConsumed : Number(p.sessionsConsumed || 0) * 60;
     const remaining = Math.max(0, totalMin - consumedMin);
+    const sessionsRemaining = Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed)
+      ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed))
+      : Math.floor(remaining / 60);
 
     return {
       id: p.id,
       displayName: p.bundle?.name ? `${p.bundle.name} • ${p.student?.name || 'Student'}` : `Purchase ${p.id}`,
       minutesRemaining: remaining,
+      sessionsRemaining,
       student: p.student ? { id: p.student.id, name: p.student.name } : null,
       bundle: p.bundle ? { id: p.bundle.id, name: p.bundle.name } : null,
       rate: p.rate,

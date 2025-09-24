@@ -1,5 +1,6 @@
 // controllers/tutors.controller.js
 const svc = require('../services/tutor.service');
+const sessionSvc = require('../services/session.service');
 const {imagekit} = require('../lib/imagekit');
 const crypto = require('node:crypto');
 
@@ -55,42 +56,44 @@ async function uploadAvatar(req, res, next) {
     try {
         const file = req.file;
         if (!file || !file.buffer) {
-            return res.status(400).json({error: {message: 'No file uploaded'}});
+            return res.status(400).json({ error: { message: 'No file uploaded' } });
         }
 
+        // Avatars: accept images only
         const detected = await sniffFileType(file.buffer);
         const okMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
         if (!detected || !okMimes.has(detected.mime)) {
-            return res.status(400).json({error: {message: 'Invalid image type'}});
+            return res.status(400).json({ error: { message: 'Invalid image type' } });
         }
+
         const ext = detected.ext === 'jpeg' ? 'jpg' : detected.ext;
         const filename = `${crypto.randomUUID()}.${ext}`;
         const folder = `/avatars/${req.user.id}`;
+        const roleTag = (req.user && req.user.role) ? String(req.user.role) : 'user';
 
+        // Upload: return URL only, no DB mutations here
         const uploadResp = await imagekit.upload({
-            file: file.buffer,
+            // Node SDK accepts Buffer; base64 is also fine:
+            file: file.buffer, // or: file.buffer.toString('base64')
             fileName: filename,
             folder,
             useUniqueFileName: true,
             isPrivateFile: false,
-            tags: ['avatar', String(req.user.id), 'tutor'],
+            tags: ['avatar', String(req.user.id), roleTag],
         });
 
         const publicUrl = uploadResp.url;
-        let profile;
-        try {
-            profile = await svc.updateAvatar(req.user.id, publicUrl);
-        } catch (dbErr) {
-            try {
-                await imagekit.deleteFile(uploadResp.fileId);
-            } catch {
-            }
-            throw dbErr;
-        }
 
-        res.json({profile, avatarUrl: publicUrl, message: 'Avatar uploaded successfully'});
+        // IMPORTANT: Do not call any DB update here.
+        // The FE will send this URL later via the normal profile update.
+
+        return res.status(201).json({
+            avatarUrl: publicUrl,
+            fileId: uploadResp.fileId,       // handy if you ever need to delete/replace
+            message: 'Avatar uploaded successfully',
+        });
     } catch (e) {
-        next(e);
+        return next(e);
     }
 }
 
@@ -98,45 +101,49 @@ async function uploadIdDocument(req, res, next) {
     try {
         const file = req.file;
         if (!file || !file.buffer) {
-            return res.status(400).json({error: {message: 'No file uploaded'}});
+            return res.status(400).json({ error: { message: 'No file uploaded' } });
         }
 
+        // Allow images + PDF
         const detected = await sniffFileType(file.buffer);
-        // allow images and PDF for ID docs
+        const mime = detected?.mime || file.mimetype; // fall back to provided mimetype
         const okMimes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-        if (!detected || !okMimes.has(detected.mime)) {
-            return res.status(400).json({error: {message: 'Invalid file type'}});
+        if (!mime || !okMimes.has(mime)) {
+            return res.status(400).json({ error: { message: 'Unsupported file type' } });
         }
-        let ext = detected.ext === 'jpeg' ? 'jpg' : detected.ext;
-        if (detected.mime === 'application/pdf') ext = 'pdf';
+
+        // Normalize extension
+        let ext = detected?.ext || (mime === 'application/pdf' ? 'pdf' : mime.split('/')[1]);
+        if (ext === 'jpeg') ext = 'jpg';
+
         const filename = `${crypto.randomUUID()}.${ext}`;
         const folder = `/id-documents/${req.user.id}`;
+        const roleTag = (req.user && req.user.role) ? String(req.user.role) : 'user';
 
+        // Upload to ImageKit: return URL only, no DB write here
         const uploadResp = await imagekit.upload({
-            file: file.buffer,
+            file: file.buffer,              // Buffer is fine; base64 string also works
             fileName: filename,
             folder,
             useUniqueFileName: true,
-            isPrivateFile: false, // set true if you want private docs + signed URLs
-            tags: ['id-document', String(req.user.id)],
+            isPrivateFile: false,           // set true for sensitive docs + signed URLs flow
+            tags: ['id-document', String(req.user.id), roleTag],
         });
 
-        const publicUrl = uploadResp.url;
-        let profile;
-        try {
-            profile = await svc.updateIdDocument(req.user.id, publicUrl);
-        } catch (dbErr) {
-            try {
-                await imagekit.deleteFile(uploadResp.fileId);
-            } catch {
-            }
-            throw dbErr;
-        }
-
-        res.json({profile, idDocumentUrl: publicUrl, message: 'Document uploaded successfully'});
+        return res.status(201).json({
+            idDocumentUrl: uploadResp.url,
+            fileId: uploadResp.fileId,
+            message: 'Document uploaded successfully',
+        });
     } catch (e) {
-        next(e);
+        return next(e);
     }
+}
+async function listAssignedPurchases(req, res, next) {
+  try {
+    const purchases = await sessionSvc.listAssignedPurchases(req.user);
+    res.json({ purchases });
+  } catch (e) { next(e); }
 }
 
 module.exports = {
@@ -146,4 +153,5 @@ module.exports = {
     listMyAssignments,
     uploadAvatar,
     uploadIdDocument,
+  listAssignedPurchases,
 };

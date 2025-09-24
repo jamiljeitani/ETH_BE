@@ -26,44 +26,36 @@ async function sniffFileType(buffer) {
     } catch { return null; }
 }
 
-async function uploadAvatar(req, res, next) {
+async function uploadAvatarOnlyUrl (req, res, next)  {
     try {
         const file = req.file;
         if (!file || !file.buffer) {
             return res.status(400).json({ error: { message: 'No file uploaded' } });
         }
 
+        // Accept images only for avatars
         const detected = await sniffFileType(file.buffer);
-        const okMimes = new Set(['image/jpeg','image/png','image/webp']);
+        const okMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
         if (!detected || !okMimes.has(detected.mime)) {
             return res.status(400).json({ error: { message: 'Invalid image type' } });
         }
+
         const ext = detected.ext === 'jpeg' ? 'jpg' : detected.ext;
-        const filename = `${crypto.randomUUID()}.${ext}`;
+        const fileName = `${crypto.randomUUID()}.${ext}`;
         const folder = `/avatars/${req.user.id}`;
 
-        const uploadResp = await imagekit.upload({
-            file: file.buffer,
-            fileName: filename,
+        // ImageKit (or your existing storage)
+        const upload = await imagekit.upload({
+            file: file.buffer.toString('base64'),
+            fileName,
             folder,
-            useUniqueFileName: true,
-            isPrivateFile: false,
-            tags: ['avatar', String(req.user.id), 'student'],
         });
 
-        const publicUrl = uploadResp.url;
-
-        let profile;
-        try {
-            profile = await studentSvc.updateAvatar(req.user.id, publicUrl);
-        } catch (dbErr) {
-            try { await imagekit.deleteFile(uploadResp.fileId); } catch {}
-            throw dbErr;
-        }
-
-        res.json({ profile, avatarUrl: publicUrl, message: 'Avatar uploaded successfully' });
-    } catch (e) { next(e); }
-}
+        return res.status(201).json({ avatarUrl: upload?.url });
+    } catch (e) {
+        next(e);
+    }
+};
 
 async function createTutorChangeRequest(req, res, next) {
     try {
@@ -78,4 +70,4 @@ async function listMyTutorChangeRequests(req, res, next) {
     } catch (e) { next(e); }
 }
 
-module.exports = { getMe, putMe, uploadAvatar, createTutorChangeRequest, listMyTutorChangeRequests };
+module.exports = { getMe, putMe, uploadAvatarOnlyUrl, createTutorChangeRequest, listMyTutorChangeRequests };

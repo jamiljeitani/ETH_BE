@@ -19,6 +19,9 @@ router.get('/me/assigned-students', ctrl.listAssignedStudents);
 /** Assignments list (student + purchase) */
 router.get('/me/assignments', ctrl.listMyAssignments);
 
+/** Purchases assigned to me (for recurrence limits) */
+router.get('/me/assigned-purchases', ctrl.listAssignedPurchases);
+
 /** File uploads (memory -> ImageKit) */
 router.post('/me/avatar', uploadMemory.single('file'), ctrl.uploadAvatar);
 router.post('/me/id-document', uploadMemory.single('idDocument'), ctrl.uploadIdDocument);

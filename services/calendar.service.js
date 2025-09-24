@@ -63,6 +63,7 @@ const includeTree = [
   { model: User, as: 'student', attributes: ['id', 'email'] },
   { model: User, as: 'tutor', attributes: ['id', 'email'] },
   { model: Subject, as: 'subject', attributes: ['id', 'name'] },
+  { model: Purchase, as: 'purchase', attributes: ['id','sessionsPurchased','sessionsConsumed'] },
 ];
 
 // ------------------------------------------------------------------
@@ -78,12 +79,36 @@ async function listEvents(user, query = {}) {
   if (user.role === 'admin') {
     if (studentId) where.studentId = studentId;
     if (tutorId) where.tutorId = tutorId;
-    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+    const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+return _rows.map(ev => {
+  const p = ev.purchase;
+  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+  // Attach virtuals for FE convenience
+  const data = ev.toJSON();
+  data.sessionsRemaining = sessionsRemaining;
+  if (!data.title && sessionsRemaining != null) {
+    data.title = `Session • rem: ${sessionsRemaining}`;
+  }
+  return data;
+});
   }
 
   if (user.role === 'student') {
     where.studentId = user.id;
-    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+    const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+return _rows.map(ev => {
+  const p = ev.purchase;
+  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+  // Attach virtuals for FE convenience
+  const data = ev.toJSON();
+  data.sessionsRemaining = sessionsRemaining;
+  if (!data.title && sessionsRemaining != null) {
+    data.title = `Session • rem: ${sessionsRemaining}`;
+  }
+  return data;
+});
   }
 
   // tutor: show
@@ -103,7 +128,19 @@ async function listEvents(user, query = {}) {
       ],
     };
 
-    return CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+    const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
+return _rows.map(ev => {
+  const p = ev.purchase;
+  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+  // Attach virtuals for FE convenience
+  const data = ev.toJSON();
+  data.sessionsRemaining = sessionsRemaining;
+  if (!data.title && sessionsRemaining != null) {
+    data.title = `Session • rem: ${sessionsRemaining}`;
+  }
+  return data;
+});
   }
 
   // fallback: nothing
@@ -343,6 +380,23 @@ async function createRecurringEvents(user, body) {
     const remainingMin = Math.max(0, purchasedMin - consumedMin);
     if (remainingMin < durationMinutes) {
         const e = new Error('Not enough remaining minutes to start a series.');
+        e.status = 400; throw e;
+    }
+
+    // Enforce that requested count does not exceed remaining capacity
+    const maxOccurrences = Math.floor(remainingMin / durationMinutes);
+    // Optionally subtract already-booked future events for this purchase
+    const futureBooked = await CalendarEvent.count({
+      where: {
+        purchaseId,
+        type: 'session',
+        status: { [Op.in]: ['proposed','accepted'] },
+        startAt: { [Op.gte]: new Date() },
+      }
+    });
+    const availableOccurrences = Math.max(0, maxOccurrences - futureBooked);
+    if (count > availableOccurrences) {
+        const e = new Error(`Not enough remaining sessions. Requested ${count}, available ${availableOccurrences}.`);
         e.status = 400; throw e;
     }
 

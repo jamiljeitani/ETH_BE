@@ -168,4 +168,18 @@ db.Feedback.belongsTo(db.User, { foreignKey: 'byUserId', as: 'byUser' });
 db.User.hasMany(db.SupportMessage, { foreignKey: 'userId', as: 'supportMessages', onDelete: 'CASCADE' });
 db.SupportMessage.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
 
+db.Purchase.hasMany(db.CalendarEvent, {
+    foreignKey: 'purchaseId',
+    as: 'calendarEvents',
+    onDelete: 'CASCADE',
+    hooks: true
+});
+
+db.User.hasMany(db.CalendarEvent, { foreignKey: 'studentId', as: 'studentCalendarEvents' });
+db.User.hasMany(db.CalendarEvent, { foreignKey: 'tutorId',   as: 'tutorCalendarEvents' });
+db.User.hasMany(db.CalendarEvent, { foreignKey: 'createdBy', as: 'createdCalendarEvents' });
+
+db.Purchase.hasMany(db.Session, { foreignKey: 'purchaseId', as: 'sessions' });
+db.Purchase.hasMany(db.Consumption, { foreignKey: 'purchaseId', as: 'consumptions' });
+
 module.exports = db;
