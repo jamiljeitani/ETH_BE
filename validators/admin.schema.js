@@ -20,12 +20,10 @@ const updateLanguage = Joi.object({
 
 // Tutor Rank
 const createTutorRank = Joi.object({
-  name: Joi.string().trim().min(2).max(120).required(),
-  order: Joi.number().integer().min(1).required()
+  name: Joi.string().trim().min(2).max(120).required()
 });
 const updateTutorRank = Joi.object({
-  name: Joi.string().trim().min(2).max(120).optional(),
-  order: Joi.number().integer().min(1).optional()
+  name: Joi.string().trim().min(2).max(120).optional()
 });
 
 // SessionType (exposed as "sessions")
