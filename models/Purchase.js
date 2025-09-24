@@ -8,7 +8,11 @@ module.exports = (sequelize, DataTypes) => {
     sessionTypeId: { type: DataTypes.UUID, allowNull: true }, // -> session_types.id
 
     sessionsPurchased: { type: DataTypes.INTEGER, allowNull: false },
-    sessionsConsumed: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      sessionsConsumed: {
+          type: DataTypes.DECIMAL(12, 4), // or DOUBLE
+          allowNull: false,
+          defaultValue: 0
+      },
 
     startDate: { type: DataTypes.DATE, allowNull: false },
     status: {
