@@ -8,20 +8,21 @@ const reportsSvc = require("../services/reports.service");
 const paymentSvc = require("../services/payment.service");
 
 const {
+  sequelize,
   User,
+  StudentProfile,
+  TutorProfile,
+  Language,
+  Subject,
+  Grade,
+  BacType,
+  TutorRank,
   Purchase,
   SessionType,
   Bundle,
-  StudentProfile,
-  TutorProfile,
-  BacType,
-  Subject,
-  TutorRank, // ✅ missing before
 } = require("../models");
 
-/* -----------------------
-   Helpers
------------------------- */
+/* ----------------------- Helpers ------------------------ */
 function rangeWhere(from, to) {
   if (!from && !to) return {};
   const w = {};
@@ -30,9 +31,7 @@ function rangeWhere(from, to) {
   return { createdAt: w };
 }
 
-/* -----------------------
-   Manual payments (admin)
------------------------- */
+/* ----------------------- Manual payments (admin) ------------------------ */
 async function listManualPayments(req, res, next) {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -55,169 +54,143 @@ async function rejectManualPayment(req, res, next) {
   } catch (e) { next(e); }
 }
 
-/* -----------------------
-   Languages
------------------------- */
+/* ----------------------- Lookups ------------------------ */
 const listLanguages = (req, res, next) => admin.language.list().then(d => res.json(d)).catch(next);
 const createLanguage = (req, res, next) => admin.language.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateLanguage = (req, res, next) => admin.language.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteLanguage = (req, res, next) => admin.language.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Subjects
------------------------- */
 const listSubjects = (req, res, next) => admin.subject.list().then(d => res.json(d)).catch(next);
 const createSubject = (req, res, next) => admin.subject.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateSubject = (req, res, next) => admin.subject.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteSubject = (req, res, next) => admin.subject.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Grades
------------------------- */
 const listGrades = (req, res, next) => admin.grade.list().then(d => res.json(d)).catch(next);
 const createGrade = (req, res, next) => admin.grade.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateGrade = (req, res, next) => admin.grade.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteGrade = (req, res, next) => admin.grade.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Bac Types
------------------------- */
 const listBacTypes = (req, res, next) => admin.bacType.list().then(d => res.json(d)).catch(next);
 const createBacType = (req, res, next) => admin.bacType.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateBacType = (req, res, next) => admin.bacType.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteBacType = (req, res, next) => admin.bacType.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Tutor Ranks
------------------------- */
 const listTutorRanks = (req, res, next) => admin.tutorRank.list().then(d => res.json(d)).catch(next);
 const createTutorRank = (req, res, next) => admin.tutorRank.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateTutorRank = (req, res, next) => admin.tutorRank.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteTutorRank = (req, res, next) => admin.tutorRank.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Session Types (sessions)
------------------------- */
+/* ----------------------- Session Types ------------------------ */
 const listSessions = (req, res, next) => admin.sessionType.list().then(d => res.json({ sessions: d })).catch(next);
 const createSession = (req, res, next) => admin.sessionType.create(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateSession = (req, res, next) => admin.sessionType.update(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteSession = (req, res, next) => admin.sessionType.remove(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Bundles
------------------------- */
+/* ----------------------- Bundles ------------------------ */
 const listBundles = (req, res, next) => admin.listBundles().then(d => res.json({ bundles: d })).catch(next);
 const createBundle = (req, res, next) => admin.createBundle(req.body).then(d => res.status(201).json(d)).catch(next);
 const updateBundle = (req, res, next) => admin.updateBundle(req.params.id, req.body).then(d => res.json(d)).catch(next);
 const deleteBundle = (req, res, next) => admin.removeBundle(req.params.id).then(d => res.json(d)).catch(next);
 
-/* -----------------------
-   Assignments
------------------------- */
+/* ----------------------- Assignments ------------------------ */
 const listAssignments = async (req, res, next) => {
   try { const data = await assignSvc.listAssignments(req.query || {}); res.json(data); }
   catch (e) { next(e); }
 };
 const createAssignment = async (req, res, next) => {
-  try {
-    const data = await assignSvc.createOrReplaceAssignment(req.user.id, req.body);
-    res.status(201).json(data);
-  } catch (e) { next(e); }
+  try { const data = await assignSvc.createOrReplaceAssignment(req.user.id, req.body); res.status(201).json(data); }
+  catch (e) { next(e); }
 };
 const updateAssignment = async (req, res, next) => {
-  try {
-    const data = await assignSvc.updateAssignment(req.user.id, req.params.id, req.body);
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await assignSvc.updateAssignment(req.user.id, req.params.id, req.body); res.json(data); }
+  catch (e) { next(e); }
 };
 const deleteAssignment = async (req, res, next) => {
-  try {
-    const data = await assignSvc.removeAssignment(req.params.id);
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await assignSvc.removeAssignment(req.params.id); res.json(data); }
+  catch (e) { next(e); }
 };
 
-/* -----------------------
-   Change Requests (admin)
------------------------- */
+/* ----------------------- Change Requests ------------------------ */
 const listChangeRequests = async (req, res, next) => {
-  try {
-    const data = await changeSvc.listAll(req.query.status);
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await changeSvc.listAll(req.query.status); res.json(data); }
+  catch (e) { next(e); }
 };
 const decideChangeRequest = async (req, res, next) => {
-  try {
-    const data = await changeSvc.decide(req.user.id, req.params.id, req.body);
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await changeSvc.decide(req.user.id, req.params.id, req.body); res.json(data); }
+  catch (e) { next(e); }
 };
 
-/* -----------------------
-   Feedback (admin-only)
------------------------- */
+/* ----------------------- Feedback ------------------------ */
 const listFeedback = async (req, res, next) => {
-  try {
-    const data = await feedbackSvc.listForAdmin(req.query || {});
-    res.json({ feedback: data });
-  } catch (e) { next(e); }
+  try { const data = await feedbackSvc.listForAdmin(req.query || {}); res.json({ feedback: data }); }
+  catch (e) { next(e); }
 };
 
-/* -----------------------
-   Reports
------------------------- */
+/* ----------------------- Reports ------------------------ */
 const reportConsumption = async (req, res, next) => {
-  try {
-    const data = await reportsSvc.getConsumptionReport(req.query || {});
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await reportsSvc.getConsumptionReport(req.query || {}); res.json(data); }
+  catch (e) { next(e); }
 };
 const reportPayouts = async (req, res, next) => {
-  try {
-    const data = await reportsSvc.getPayoutsReport(req.query || {});
-    res.json(data);
-  } catch (e) { next(e); }
+  try { const data = await reportsSvc.getPayoutsReport(req.query || {}); res.json(data); }
+  catch (e) { next(e); }
 };
 
-/* -----------------------
-   Users: list & purchases
------------------------- */
-const listUsers = async (req, res, next) => {
-  try {
-    const { role, from, to } = req.query;
-    const where = { ...(role ? { role } : {}), ...rangeWhere(from, to) };
-
-    const users = await User.findAll({
-      where,
-      attributes: ["id", "email", "role", "createdAt"],
+/* ----------------------- Users: list & purchases ------------------------ */
+function studentDeepInclude() {
+  return [
+    {
+      model: StudentProfile,
+      as: "studentProfile",
       include: [
-        { model: StudentProfile, as: "studentProfile", required: false },
-        { model: TutorProfile, as: "tutorProfile", required: false },
+        { model: Grade, as: "grade", attributes: ["id", "name"] },
+        { model: BacType, as: "bacTypes", attributes: ["id", "name"], through: { attributes: [] } },
+        { model: Language, as: "languages", attributes: ["id", "name"], through: { attributes: [] } },
+        { model: Subject, as: "subjects", attributes: ["id", "name"], through: { attributes: [] } },
       ],
-      order: [["createdAt", "DESC"]],
+    },
+  ];
+}
+function tutorDeepInclude() {
+  return [
+    {
+      model: TutorProfile,
+      as: "tutorProfile",
+      include: [
+        { model: TutorRank, as: "rank", attributes: ["id", "name", "order"] },
+        { model: Language, as: "languages", attributes: ["id", "name"], through: { attributes: [] } },
+        { model: Subject, as: "subjects", attributes: ["id", "name"], through: { attributes: [] } },
+        { model: BacType, as: "bacTypes", attributes: ["id", "name"], through: { attributes: [] } },
+      ],
+    },
+  ];
+}
+
+/** GET /admin/users?role=student|tutor|admin */
+const listUsers = async (req, res) => {
+  try {
+    const { role } = req.query;
+    const users = await admin.listUsers({ role }); // service does the right include
+    res.json({ users });
+  } catch (err) {
+    console.error("Admin listUsers failed:", err);
+    res.status(500).json({ error: { code: "SERVER_ERROR", message: err.message || "Failed to list users" } });
+  }
+};
+
+/** GET /admin/users/:id — deep detail for Admin drawer (both roles) */
+const getUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id, {
+      include: [...studentDeepInclude(), ...tutorDeepInclude()],
     });
-
-    const formattedUsers = users.map((u) => {
-      const p = u.get({ plain: true });
-      const displayName =
-        p.role === "student"
-          ? (p.studentProfile?.fullName || p.email)
-          : p.role === "tutor"
-          ? (p.tutorProfile?.fullName || p.email)
-          : p.email;
-
-      const profileInfo =
-        p.role === "student"
-          ? p.studentProfile?.school
-          : p.role === "tutor"
-          ? p.tutorProfile?.educationLevel
-          : null;
-
-      return { ...p, displayName, profileInfo };
-    });
-
-    res.json({ users: formattedUsers });
-  } catch (err) { next(err); }
+    if (!user) return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found" } });
+    res.json({ user });
+  } catch (err) {
+    console.error("Admin getUser failed:", err);
+    res.status(500).json({ error: { code: "SERVER_ERROR", message: err.message || "Failed to fetch user" } });
+  }
 };
 
 const listStudentPurchases = async (req, res, next) => {
@@ -235,9 +208,7 @@ const listStudentPurchases = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-/* -----------------------
-   Dashboard stats + recents
------------------------- */
+/* ----------------------- Dashboard & misc ------------------------ */
 const getDashboardStats = async (req, res, next) => {
   try {
     const now = new Date();
@@ -350,30 +321,16 @@ const getRecentTutors = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-/* -----------------------
-   NEW: Counts endpoints
------------------------- */
+/* ----------------------- Counts & generic user ops ------------------------ */
 const countUsers = async (req, res, next) => {
-  try {
-    const { role, from, to } = req.query;
-    const where = { ...(role ? { role } : {}), ...rangeWhere(from, to) };
-    const count = await User.count({ where });
-    res.json({ count });
-  } catch (e) { next(e); }
+  try { const { role } = req.query; const where = role ? { role } : {}; const total = await User.count({ where }); res.json({ count: total }); }
+  catch (e) { next(e); }
 };
-
 const countSessions = async (req, res, next) => {
-  try {
-    const { from, to } = req.query;
-    const where = rangeWhere(from, to);
-    const count = await SessionType.count({ where });
-    res.json({ count });
-  } catch (e) { next(e); }
+  try { const { from, to } = req.query; const where = rangeWhere(from, to); const count = await SessionType.count({ where }); res.json({ count }); }
+  catch (e) { next(e); }
 };
 
-/* -----------------------
-   NEW: Generic user update/delete
------------------------- */
 const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -395,7 +352,6 @@ const updateUser = async (req, res, next) => {
     }
 
     if (Object.keys(rest).length) await user.update(rest);
-
     res.json({ ok: true });
   } catch (e) { next(e); }
 };
@@ -413,7 +369,8 @@ const deleteUser = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-const getTutorRankUsage = async (req, res, next) => {
+/* ----------------------- Tutor Ranks analytics & assignment ------------------------ */
+const getTutorRankUsage = async (_, res, next) => {
   try {
     const ranks = await TutorRank.findAll({ order: [['name','ASC']] });
     const profiles = await TutorProfile.findAll({ attributes: ['rankId'] });
@@ -433,14 +390,7 @@ const assignTutorRank = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* -----------------------
-   Legacy specific update/delete (still exported)
------------------------- */
-const updateStudent = async (req, res, next) => updateUser(req, res, next);
-const deleteStudent = async (req, res, next) => deleteUser(req, res, next);
-const updateTutor   = async (req, res, next) => updateUser(req, res, next);
-const deleteTutor   = async (req, res, next) => deleteUser(req, res, next);
-
+/* ----------------------- Exports ------------------------ */
 module.exports = {
   // lookups
   listLanguages, createLanguage, updateLanguage, deleteLanguage,
@@ -461,7 +411,7 @@ module.exports = {
   listFeedback, reportConsumption, reportPayouts,
 
   // users & purchases
-  listUsers, listStudentPurchases,
+  listUsers, listStudentPurchases, getUser,
 
   // dashboard
   getDashboardStats, getRecentStudents, getRecentTutors,
@@ -469,11 +419,9 @@ module.exports = {
   // manual payments
   listManualPayments, approveManualPayment, rejectManualPayment,
 
-  // NEW: counts and generic user mutators
+  // counts & generic user ops
   countUsers, countSessions, updateUser, deleteUser,
 
-  // legacy aliases
-  updateStudent, deleteStudent, updateTutor, deleteTutor,
-
+  // ranks
   getTutorRankUsage, assignTutorRank,
 };

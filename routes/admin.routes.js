@@ -2,6 +2,7 @@
 const router = require("express").Router();
 
 const ctrl = require("../controllers/admin.controller");
+const admin = require("../controllers/admin.controller");
 const { validate } = require("../middlewares/validate.middleware");
 const { authMiddleware } = require("../middlewares/auth.middleware");
 const { requireRole } = require("../middlewares/role.middleware");
@@ -206,8 +207,11 @@ router.get(
 );
 
 /* ---------- Users & Purchases (Assignments support) ---------- */
-router.get("/users", ensureCtrl("listUsers"));
 router.get("/users/count", ensureCtrl("countUsers"));
+router.get("/users", admin.listUsers);
+
+// NEW: deep detail for Admin drawer
+router.get("/users/:id", ensureCtrl("getUser"));
 
 router.get(
   "/students/:id/purchases",
