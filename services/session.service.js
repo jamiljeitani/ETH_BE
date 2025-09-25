@@ -1,7 +1,7 @@
 // server/services/session.service.js
 const { Op } = require('sequelize');
 const {
-  sequelize, User, Purchase, Assignment, Session, SessionTiming, Consumption, Timesheet, SessionType
+  sequelize, User, Purchase, Assignment, Session, SessionTiming, Consumption, Timesheet, SessionType, StudentProfile
 } = require('../models');
 
 /* ---------- utils ---------- */
@@ -126,13 +126,8 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
         }],
     });
 
-    // Per-session cap (minutes): sessionType.sessionHours → purchase.sessionHours → 60
-    const sessionHoursRaw = Number(purchase?.sessionType?.sessionHours);
-    const perSessionMin =
-        (Number.isFinite(sessionHoursRaw) && sessionHoursRaw > 0)
-            ? sessionHoursRaw * 60
-            : (Number.isFinite(Number(purchase?.sessionHours)) && Number(purchase.sessionHours) > 0
-                ? Number(purchase.sessionHours) * 60
+    const perSessionMin = (Number.isFinite(Number(purchase?.sessionType?.sessionHours)) && Number(purchase?.sessionType?.sessionHours) > 0
+                ? Number(purchase?.sessionType?.sessionHours) * 60
                 : 60);
 
     // Balances (all in minutes); using sessionsConsumed as the source
@@ -227,7 +222,10 @@ exports.listMine = async (user, query = {}) => {
 
   const sessions = await Session.findAll({
     where,
-    include: [{ association: 'purchase' }, { association: 'timings' }],
+    include: [{ association: 'purchase',
+        include: [
+            { association: 'sessionType' }
+        ] }, { association: 'timings' }, { association: 'timesheets' }, { association: 'student',include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName']}] }],
     order: [['createdAt','DESC']]
   });
 
@@ -249,14 +247,15 @@ exports.listMine = async (user, query = {}) => {
     }
 
     const rateOut = isIntCol(Timesheet,'rate') ? toCents(rateHr) : Number(rateHr);
-    const amountOut = isIntCol(Timesheet,'amount') ? toCents(amount) : Number(amount.toFixed(2));
 
     rows.push({
       sessionId: s.id,
       status: s.status,
+      purchaseTitle: s.purchase?.sessionType?.name + "(" + s.purchase?.sessionsPurchased + ")",
+      studentName: s.student?.studentProfile?.fullName || s.student?.email || 'Student',
       minutes,
       rate: rateOut,
-      amount: amountOut,
+      amount: s?.timesheets?.amount ?? 0,
       currency: s.purchase?.currency || 'USD',
       purchaseId: s.purchase?.id || s.purchaseId
     });
@@ -274,8 +273,8 @@ exports.listAssignedPurchases = async (user) => {
               association: 'purchase',
               include: [
                   { association: 'bundle' },
-                  { association: 'student' },
-                  { association: 'sessionType' },
+                  { association: 'student',include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }] },
+                  { association: 'sessionType', },
               ],
       },
       ],
@@ -295,7 +294,7 @@ exports.listAssignedPurchases = async (user) => {
 
     return {
       id: p.id,
-      displayName: p.bundle?.name ? `${p.bundle.name} • ${p.tutor?.fullName || 'Tutor'}` : `${p.sessionType.name}` + '(' + p.sessionsPurchased + ')' + ` • ${p.tutor?.fullName || 'Tutor'}`,
+      displayName: p.bundle?.name ? `${p.bundle.name} • ${p.tutor?.fullName || 'Tutor'}` : `${p.sessionType.name}` + '(' + p.sessionsPurchased + ')' + ` • ${p.student?.studentProfile?.fullName || 'Student'}`,
       minutesRemaining: remaining,
       sessionsRemaining,
       student: p.student ? { id: p.student.id, name: p.student.name } : null,
@@ -304,5 +303,5 @@ exports.listAssignedPurchases = async (user) => {
       currency: p.currency,
       status: p.status
     };
-  });
+  }).filter(item => item.sessionsRemaining > 0);
 };

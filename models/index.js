@@ -151,6 +151,11 @@ db.Session.belongsTo(db.Subject, { foreignKey: 'subjectId', as: 'subject' });
 db.Session.belongsTo(db.Purchase, { foreignKey: 'purchaseId', as: 'purchase' });
 db.Session.belongsTo(db.CalendarEvent, { foreignKey: 'calendarEventId', as: 'calendarEvent' });
 db.Session.hasMany(db.SessionTiming, { foreignKey: 'sessionId', as: 'timings', onDelete: 'CASCADE' });
+db.Session.hasOne(db.Timesheet, {
+    foreignKey: 'sessionId',
+    as: 'timesheets',
+    onDelete: 'CASCADE'
+});
 
 // Consumption
 db.Consumption.belongsTo(db.Purchase, { foreignKey: 'purchaseId', as: 'purchase' });
