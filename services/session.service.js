@@ -121,14 +121,32 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
     purchase = await purchase.reload({
         transaction: t,
         include: [{
+            association: 'bundle',
+            include: [
+                { association: 'items', include: [{ association: 'sessionType' }] }
+            ]
+        },{
             association: 'sessionType',
             attributes: ['id', 'name', 'sessionHours'] // we rely on sessionHours here
         }],
     });
 
-    const perSessionMin = (Number.isFinite(Number(purchase?.sessionType?.sessionHours)) && Number(purchase?.sessionType?.sessionHours) > 0
-                ? Number(purchase?.sessionType?.sessionHours) * 60
-                : 60);
+    const isBundle = Array.isArray(purchase?.bundle?.items) && purchase.bundle.items.length > 0;
+
+    let perSessionMin = 60;
+    if(isBundle) {
+        perSessionMin = purchase.bundle.items.reduce((sum, it) => {
+            const sessionCount = Number(it?.hours || 0); // actually "sessionNumber"
+            const stH = Number(it?.sessionType?.sessionHours);
+            const perSessionMin = Number.isFinite(stH) && stH > 0 ? stH * 60 : 60;
+            return sum + (sessionCount * perSessionMin);
+        }, 0);
+    }
+    else {
+         perSessionMin = (Number.isFinite(Number(purchase?.sessionType?.sessionHours)) && Number(purchase?.sessionType?.sessionHours) > 0
+            ? Number(purchase?.sessionType?.sessionHours) * 60
+            : 60);
+    }
 
     // Balances (all in minutes); using sessionsConsumed as the source
     const totalBalMin       = Number(purchase.sessionsPurchased || 0) * perSessionMin;
@@ -187,6 +205,18 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
         status: 'pending',
         ...moneyPayload
     }, { transaction: t });
+    // Update tutor wallet (increment by payable amount)
+    try {
+        const { TutorProfile } = require('../models');
+        const tp = await TutorProfile.findOne({ where: { userId: s.tutorId }, transaction: t, lock: t.LOCK.UPDATE });
+        if (tp) {
+            await tp.update({ walletAmount: sequelize.literal(`COALESCE("walletAmount",0) + ${Number(amount).toFixed(2)}`) }, { transaction: t });
+        }
+    } catch (e) {
+        // Non-fatal: log and continue (wallet can be reconciled later)
+        console.warn('Wallet update failed:', e?.message || e);
+    }
+
 
     await s.update(
         { status: 'completed', endedAt: new Date(), totalMinutes, overageMinutes: overage },
@@ -267,41 +297,84 @@ exports.listMine = async (user, query = {}) => {
 exports.listAssignedPurchases = async (user) => {
   if (user.role !== 'tutor') { const e = new Error('Forbidden'); e.status = 403; throw e; }
 
-  const assigns = await Assignment.findAll({
-      where: { tutorId: user.id },
-      include: [{
-              association: 'purchase',
-              include: [
-                  { association: 'bundle' },
-                  { association: 'student',include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }] },
-                  { association: 'sessionType', },
-              ],
-      },
-      ],
-      order: [['createdAt', 'DESC']],
-      subQuery: false,
-      distinct: true,
-  });
+    const assigns = await Assignment.findAll({
+        where: { tutorId: user.id },
+        include: [{
+            association: 'purchase',
+            include: [
+                {
+                    association: 'bundle',
+                    include: [
+                        { association: 'items', include: [{ association: 'sessionType' }] }
+                    ]
+                },
+                { association: 'student', include: [{ model: StudentProfile, as: 'studentProfile', attributes: ['fullName'] }] },
+                { association: 'sessionType' }, // for single-session purchases
+            ],
+        }],
+        order: [['createdAt', 'DESC']],
+        subQuery: false,
+        distinct: true,
+    });
 
-  return assigns.map(a => {
-    const p = a.purchase || {};
-    const totalMin = (typeof p.minutesTotal === 'number') ? p.minutesTotal : Number(p.sessionsPurchased || 0) * p.sessionType.sessionHours * 60;
-    const consumedMin = (typeof p.minutesConsumed === 'number') ? p.minutesConsumed : Number(p.sessionsConsumed || 0) * p.sessionType.sessionHours * 60;
-    const remaining = Math.max(0, totalMin - consumedMin);
-    const sessionsRemaining = Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed)
-      ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed))
-      : Math.floor(remaining / 60);
+    return assigns.map(a => {
+        const p = a.purchase || {};
+        const isBundle = Array.isArray(p?.bundle?.items) && p.bundle.items.length > 0;
 
-    return {
-      id: p.id,
-      displayName: p.bundle?.name ? `${p.bundle.name} • ${p.tutor?.fullName || 'Tutor'}` : `${p.sessionType.name}` + '(' + p.sessionsPurchased + ')' + ` • ${p.student?.studentProfile?.fullName || 'Student'}`,
-      minutesRemaining: remaining,
-      sessionsRemaining,
-      student: p.student ? { id: p.student.id, name: p.student.name } : null,
-      bundle: p.bundle ? { id: p.bundle.id, name: p.bundle.name } : null,
-      rate: p.rate,
-      currency: p.currency,
-      status: p.status
-    };
-  }).filter(item => item.sessionsRemaining > 0);
+        let totalMin = 0;
+        let consumedMin = 0;
+        let minutesRemaining = 0;
+        let sessionsRemaining = 0;
+
+        if (isBundle) {
+            // bundle_items.hours === sessionNumber
+            totalMin = p.bundle.items.reduce((sum, it) => {
+                const sessionCount = Number(it?.hours || 0); // actually "sessionNumber"
+                const stH = Number(it?.sessionType?.sessionHours);
+                const perSessionMin = Number.isFinite(stH) && stH > 0 ? stH * 60 : 60;
+                return sum + (sessionCount * perSessionMin);
+            }, 0);
+
+            const purchased = Number(p?.sessionsPurchased || 0);
+            const consumed  = Number(p?.sessionsConsumed  || 0);
+
+            totalMin    = purchased * totalMin;
+            consumedMin = consumed  * totalMin / purchased; // proportional consumption
+            minutesRemaining = Math.max(0, totalMin - consumedMin);
+
+            // Coarse session count for UI filtering (bundles mix types)
+            sessionsRemaining = Math.floor(minutesRemaining / 60);
+        } else {
+            const stH = Number(p?.sessionType?.sessionHours);
+            const perSessionMin = Number.isFinite(stH) && stH > 0 ? stH * 60 : 60;
+
+            const purchased = Number(p?.sessionsPurchased || 0);
+            const consumed  = Number(p?.sessionsConsumed  || 0);
+
+            // Exact formula you requested
+            totalMin    = purchased * perSessionMin;
+            consumedMin = consumed  * perSessionMin;
+
+            minutesRemaining = Math.max(0, totalMin - consumedMin);
+            sessionsRemaining = Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed)
+                ? Math.max(0, purchased - consumed)
+                : Math.floor(minutesRemaining / perSessionMin);
+        }
+
+        const displayName = p.bundle?.name
+            ? `${p.bundle.name} • ${p?.tutor?.fullName || 'Tutor'}`
+            : `${p?.sessionType?.name || 'Session'}(${p?.sessionsPurchased ?? '-'}) • ${p.student?.studentProfile?.fullName || 'Student'}`;
+
+        return {
+            id: p.id,
+            displayName,
+            minutesRemaining,
+            sessionsRemaining,
+            student: p.student ? { id: p.student.id, name: p.student.name } : null,
+            bundle: p.bundle ? { id: p.bundle.id, name: p.bundle.name } : null,
+            rate: p.rate,
+            currency: p.currency,
+            status: p.status
+        };
+    }).filter(item => item.sessionsRemaining > 0);
 };

@@ -19,6 +19,9 @@ module.exports = (sequelize, DataTypes) => {
     idDocumentUrl: { type: DataTypes.STRING, allowNull: false },
     profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
 
+    // Wallet balance (accumulates approved/pending earnings)
+    walletAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
+
     preferredGradesText: { type: DataTypes.STRING, allowNull: true }
   }, {
     tableName: 'tutor_profiles',

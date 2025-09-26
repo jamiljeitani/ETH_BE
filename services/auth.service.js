@@ -21,6 +21,7 @@ function sanitizeUser(u, extras = {}) {
         createdAt: u.createdAt,
         profilePictureUrl: extras.profilePictureUrl ?? null,
         idDocumentUrl: extras.idDocumentUrl ?? null,
+        walletAmount: extras.walletAmount ?? null,
     };
 }
 
@@ -159,6 +160,7 @@ async function getUserById(userId) {
     // Attach profile fields based on role
     let profilePictureUrl = null;
     let idDocumentUrl = null;
+    let walletAmount = null;
 
     if (user.role === 'student') {
         const sp = await StudentProfile.findOne({ where: { userId: user.id } });
@@ -171,10 +173,11 @@ async function getUserById(userId) {
         if (tp) {
             profilePictureUrl = tp.profilePictureUrl || null;
             idDocumentUrl = tp.idDocumentUrl || null;
+            walletAmount = tp.walletAmount ?? null;
         }
     }
 
-    return sanitizeUser(user, { profilePictureUrl, idDocumentUrl });
+    return sanitizeUser(user, { profilePictureUrl, idDocumentUrl, walletAmount });
 }
 
 module.exports = { signup, verifyEmail, login, refresh, forgotPassword, resetPassword, updateUserPreferences, getUserPreferences, getUserById };

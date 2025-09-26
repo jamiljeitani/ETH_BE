@@ -8,14 +8,7 @@
     "start": "node server.js",
     "seed:admin": "node scripts/seed-admin.js",
     "seed:languages": "node scripts/seed-languages.js",
-    "migration:pref-language": "node scripts/add-preferred-language-migration.js",
-    "migration": "node scripts/migration.js",
-    "migration:subject": "node scripts/subject-migration.js",
-    "migration:bundle": "node scripts/bundle-migration.js",
-    "migration:bactype": "node scripts/bactype-migration.js",
-    "migration:tutor-profile": "node scripts/tutor-profile-migration.js",
-    "migration:student-avatar": "node scripts/student-avatar.js",
-    "migration:tutor-avatar": "node scripts/tutor-avatar.js"
+    "migration-wallet": "node migrations/add-wallet-amount-to-tutor-profiles.js"
   },
   "keywords": [],
   "author": "",

@@ -139,6 +139,7 @@ async function uploadIdDocument(req, res, next) {
         return next(e);
     }
 }
+
 async function listAssignedPurchases(req, res, next) {
   try {
     const purchases = await sessionSvc.listAssignedPurchases(req.user);
