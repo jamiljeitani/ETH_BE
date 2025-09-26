@@ -45,9 +45,12 @@ async function listStudentPurchasesWithConsumption(studentId) {
                 return sum + (sessionCount * perSessionMin);
             }, 0) * p.sessionsPurchased;
 
-            // For bundles, prefer explicit consumptions
-            consumedMinutes = sumConsumedFromRows || Number(p.minutesConsumed || 0);
+            const purchased = Number(p?.sessionsPurchased || 0);
+            const consumed  = Number(p?.sessionsConsumed  || 0);
 
+            consumedMinutes = consumed  * purchasedMinutes / purchased; // proportional consumption
+
+            // For bundles, prefer explicit consumptions
             sessionsRemaining = p.sessionsPurchased - p.sessionsConsumed;
         } else {
             const purchased = toInt(p.sessionsPurchased);
