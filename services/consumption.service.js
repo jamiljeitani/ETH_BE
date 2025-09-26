@@ -43,12 +43,12 @@ async function listStudentPurchasesWithConsumption(studentId) {
                 const stH = Number(it?.sessionType?.sessionHours);
                 const perSessionMin = Number.isFinite(stH) && stH > 0 ? stH * 60 : 60;
                 return sum + (sessionCount * perSessionMin);
-            }, 0);
+            }, 0) * p.sessionsPurchased;
 
             // For bundles, prefer explicit consumptions
             consumedMinutes = sumConsumedFromRows || Number(p.minutesConsumed || 0);
 
-            sessionsRemaining = Math.floor(Math.max(0, purchasedMinutes - consumedMinutes) / 60);
+            sessionsRemaining = p.sessionsPurchased - p.sessionsConsumed;
         } else {
             const purchased = toInt(p.sessionsPurchased);
             const consumedSessions = toDec(p.sessionsConsumed); // can be fractional
