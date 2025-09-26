@@ -11,7 +11,7 @@ async function getTutorWallet(tutorId) {
 }
 
 // Tutor creates a withdrawal request (deduct immediately, status=pending)
-async function createWithdrawRequest(tutorId, { amount, method, note = null, currency = 'USD' }) {
+async function createWithdrawRequest(tutorId, { amount, method, note = null, currency = 'USD', phoneNumber = null, iban = null }) {
   if (!OFFLINE_METHODS.has(String(method))) {
     const e = new Error('Unsupported payout method'); e.status = 400; throw e;
   }
@@ -25,8 +25,15 @@ async function createWithdrawRequest(tutorId, { amount, method, note = null, cur
     const current = Number(tp.walletAmount || 0);
     if (amt > current) { const e = new Error('Amount exceeds wallet balance'); e.status = 400; throw e; }
 
+        // Validate payout details: phone for non-wired, IBAN for wired_transfer
+    if (String(method) === 'wired_transfer') {
+      if (!iban || String(iban).trim().length < 8) { const e = new Error('IBAN is required for wired_transfer'); e.status = 400; throw e; }
+    } else {
+      if (!phoneNumber || String(phoneNumber).trim().length < 6) { const e = new Error('Phone number is required for this payout method'); e.status = 400; throw e; }
+    }
+
     const tx = await WalletTransaction.create({
-      tutorId, method, amount: amt, currency, status: 'pending', note, requestedBy: tutorId
+      tutorId, method, amount: amt, currency, status: 'pending', note, requestedBy: tutorId, phoneNumber, iban
     }, { transaction: t });
 
     await tp.update({ walletAmount: sequelize.literal(`COALESCE("walletAmount",0) - ${amt.toFixed(2)}`) }, { transaction: t });
@@ -47,17 +54,35 @@ async function listMyWithdrawRequests(tutorId, { limit = 50, offset = 0 } = {}) 
 }
 
 // Admin
+// services/wallet.service.js
 async function adminListWithdrawRequests({ status = null, tutorId = null, limit = 50, offset = 0 } = {}) {
-  const where = {};
-  if (status) where.status = status;
-  if (tutorId) where.tutorId = tutorId;
-  const rows = await WalletTransaction.findAll({
-    where, order: [['createdAt','DESC']],
-    limit: Math.min(200, Number(limit)||50),
-    offset: Number(offset)||0
-  });
-  return rows;
+    const where = {};
+    if (status) where.status = status;
+    if (tutorId) where.tutorId = tutorId;
+
+    const rows = await WalletTransaction.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+        limit: Math.min(200, Number(limit) || 50),
+        offset: Number(offset) || 0,
+        include: [
+            {
+                model: TutorProfile,
+                as: 'tutorProfile',
+                attributes: ['fullName'],
+            },
+        ],
+    });
+
+    // flatten tutor name into each row for convenience
+    return rows.map(r => {
+        const j = r.toJSON();
+        j.tutorName = j.tutorProfile?.fullName || null;
+        delete j.tutorProfile;
+        return j;
+    });
 }
+
 
 async function adminMarkPaid(adminId, txId) {
   return sequelize.transaction(async (t) => {

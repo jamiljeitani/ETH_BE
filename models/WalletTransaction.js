@@ -13,7 +13,9 @@ module.exports = (sequelize, DataTypes) => {
     note: { type: DataTypes.TEXT, allowNull: true },
     requestedBy: { type: DataTypes.UUID, allowNull: false }, // tutor userId
     processedBy: { type: DataTypes.UUID, allowNull: true }, // admin userId
-    processedAt: { type: DataTypes.DATE, allowNull: true }
+    processedAt: { type: DataTypes.DATE, allowNull: true },
+    phoneNumber: { type: DataTypes.STRING, allowNull: true },
+    iban: { type: DataTypes.STRING, allowNull: true }
   }, {
     tableName: 'wallet_transactions',
     indexes: [{ fields: ['tutorId'] }, { fields: ['method'] }, { fields: ['status'] }]

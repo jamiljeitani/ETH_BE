@@ -175,9 +175,9 @@ async function listMyWithdrawals(req, res, next) {
 }
 async function createWithdrawRequest(req, res, next) {
   try {
-    const { amount, method, note } = req.body || {};
+    const { amount, method, note, phoneNumber, iban } = req.body || {};
     const svc = require('../services/wallet.service');
-    const data = await svc.createWithdrawRequest(req.user.id, { amount, method, note });
+    const data = await svc.createWithdrawRequest(req.user.id, { amount, method, note, phoneNumber, iban });
     res.json({ success: true, ...data });
   } catch (e) { next(e); }
 }

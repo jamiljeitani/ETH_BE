@@ -9,7 +9,8 @@
     "seed:admin": "node scripts/seed-admin.js",
     "seed:languages": "node scripts/seed-languages.js",
     "migration-wallet": "node migrations/add-wallet-amount-to-tutor-profiles.js",
-    "migration-create-wallet-table": "node migrations/create-wallet-transactions.js"
+    "migration-create-wallet-table": "node migrations/create-wallet-transactions.js",
+    "migration-alter-table-add-fields": "node migrations/add-phone-iban-to-wallet-transactions.js"
   },
   "keywords": [],
   "author": "",

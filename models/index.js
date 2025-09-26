@@ -200,5 +200,6 @@ db.WalletTransaction.belongsTo(db.User, {
     as: 'tutor'
 });
 
+db.WalletTransaction.belongsTo(db.TutorProfile, { foreignKey: 'tutorId', targetKey: 'userId', as: 'tutorProfile' });
 
 module.exports = db;
