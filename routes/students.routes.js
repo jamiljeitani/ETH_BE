@@ -21,4 +21,10 @@ router.post('/me/avatar', uploadMemory.single('file'), ctrl.uploadAvatarOnlyUrl)
 router.post('/tutor-change-requests', validate(schema.createTutorChangeRequest), ctrl.createTutorChangeRequest);
 router.get('/tutor-change-requests', ctrl.listMyTutorChangeRequests);
 
+
+// Consumption (student)
+router.get('/me/consumption', ctrl.getMyConsumption);
+router.get('/me/consumption/history', ctrl.getMyConsumptionHistory);
+
+
 module.exports = router;

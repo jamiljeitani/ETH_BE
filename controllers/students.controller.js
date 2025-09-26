@@ -70,4 +70,23 @@ async function listMyTutorChangeRequests(req, res, next) {
     } catch (e) { next(e); }
 }
 
-module.exports = { getMe, putMe, uploadAvatarOnlyUrl, createTutorChangeRequest, listMyTutorChangeRequests };
+
+async function getMyConsumption(req, res, next) {
+    try {
+        const svc = require('../services/consumption.service');
+        const data = await svc.listStudentPurchasesWithConsumption(req.user.id);
+        res.json(data);
+    } catch (e) { next(e); }
+}
+
+async function getMyConsumptionHistory(req, res, next) {
+    try {
+        const svc = require('../services/consumption.service');
+        const { purchaseId, limit, offset } = req.query;
+        const items = await svc.listStudentConsumptionHistory(req.user.id, { purchaseId, limit, offset });
+        res.json({ items });
+    } catch (e) { next(e); }
+}
+
+
+module.exports = {getMe, putMe, uploadAvatarOnlyUrl, createTutorChangeRequest, listMyTutorChangeRequests, getMyConsumption, getMyConsumptionHistory};
