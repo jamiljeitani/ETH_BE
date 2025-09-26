@@ -50,6 +50,8 @@ db.Timesheet = require('./Timesheet')(sequelize, Sequelize.DataTypes);
 db.Feedback = require('./Feedback')(sequelize, Sequelize.DataTypes);
 
 db.SupportMessage = require('./SupportMessage')(sequelize, Sequelize.DataTypes);
+db.WalletTransaction = require('./WalletTransaction')(sequelize, Sequelize.DataTypes);
+
 
 
 // Associations (Phase 1)
@@ -186,5 +188,17 @@ db.User.hasMany(db.CalendarEvent, { foreignKey: 'createdBy', as: 'createdCalenda
 
 db.Purchase.hasMany(db.Session, { foreignKey: 'purchaseId', as: 'sessions' });
 db.Purchase.hasMany(db.Consumption, { foreignKey: 'purchaseId', as: 'consumptions' });
+
+// Wallet associations
+db.User.hasMany(db.WalletTransaction, {
+    foreignKey: 'tutorId',
+    as: 'walletTransactions',
+    onDelete: 'CASCADE'
+});
+db.WalletTransaction.belongsTo(db.User, {
+    foreignKey: 'tutorId',
+    as: 'tutor'
+});
+
 
 module.exports = db;

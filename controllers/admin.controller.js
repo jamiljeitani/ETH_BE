@@ -425,3 +425,53 @@ module.exports = {
   // ranks
   getTutorRankUsage, assignTutorRank,
 };
+
+
+/* ---------- Wallet (Tutor) ---------- */
+async function getTutorWallet(req, res, next) {
+  try {
+    const { id } = req.params;
+    const svc = require('../services/wallet.service');
+    const data = await svc.getTutorWallet(id);
+    res.json(data);
+  } catch (e) { next(e); }
+}
+async function withdrawTutorWallet(req, res, next) {
+  try {
+    const { id } = req.params; // tutorId
+    const { amount, method, note } = req.body || {};
+    const svc = require('../services/wallet.service');
+    const data = await svc.withdraw(req.user.id, id, { amount, method, note });
+    res.json({ success: true, ...data });
+  } catch (e) { next(e); }
+}
+
+module.exports = { ...module.exports, getTutorWallet, withdrawTutorWallet };
+
+/* ---------- Admin Wallet Requests ---------- */
+async function listWithdrawRequests(req, res, next) {
+  try {
+    const { status, tutorId, limit, offset } = req.query || {};
+    const svc = require('../services/wallet.service');
+    const rows = await svc.adminListWithdrawRequests({ status, tutorId, limit, offset });
+    res.json({ items: rows });
+  } catch (e) { next(e); }
+}
+async function markWithdrawPaid(req, res, next) {
+  try {
+    const { id } = req.params;
+    const svc = require('../services/wallet.service');
+    const tx = await svc.adminMarkPaid(req.user.id, id);
+    res.json({ success: true, transaction: tx });
+  } catch (e) { next(e); }
+}
+async function cancelWithdrawRequest(req, res, next) {
+  try {
+    const { id } = req.params;
+    const svc = require('../services/wallet.service');
+    const data = await svc.adminCancelRequest(req.user.id, id);
+    res.json({ success: true, ...data });
+  } catch (e) { next(e); }
+}
+
+module.exports = { ...module.exports, listWithdrawRequests, markWithdrawPaid, cancelWithdrawRequest };

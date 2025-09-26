@@ -8,7 +8,8 @@
     "start": "node server.js",
     "seed:admin": "node scripts/seed-admin.js",
     "seed:languages": "node scripts/seed-languages.js",
-    "migration-wallet": "node migrations/add-wallet-amount-to-tutor-profiles.js"
+    "migration-wallet": "node migrations/add-wallet-amount-to-tutor-profiles.js",
+    "migration-create-wallet-table": "node migrations/create-wallet-transactions.js"
   },
   "keywords": [],
   "author": "",

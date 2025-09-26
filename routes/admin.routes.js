@@ -248,3 +248,15 @@ router.patch(
 
 
 module.exports = router;
+
+
+/* ---------- Tutor Wallet ---------- */
+router.get('/tutors/:id/wallet', ensureCtrl('getTutorWallet'));
+router.post('/tutors/:id/wallet/withdraw', ensureCtrl('withdrawTutorWallet'));
+
+
+
+// Wallet withdraw requests
+router.get('/withdrawals', ensureCtrl('listWithdrawRequests'));
+router.post('/withdrawals/:id/paid', ensureCtrl('markWithdrawPaid'));
+router.post('/withdrawals/:id/cancel', ensureCtrl('cancelWithdrawRequest'));

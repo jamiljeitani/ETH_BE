@@ -19,6 +19,11 @@ router.get('/me/assigned-students', ctrl.listAssignedStudents);
 /** Assignments list (student + purchase) */
 router.get('/me/assignments', ctrl.listMyAssignments);
 
+/** Wallet */
+router.get('/me/wallet', ctrl.getMyWallet);
+router.get('/me/withdrawals', ctrl.listMyWithdrawals);
+router.post('/me/withdrawals', ctrl.createWithdrawRequest);
+
 /** Purchases assigned to me (for recurrence limits) */
 router.get('/me/assigned-purchases', ctrl.listAssignedPurchases);
 

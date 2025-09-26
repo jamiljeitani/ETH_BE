@@ -139,7 +139,6 @@ async function uploadIdDocument(req, res, next) {
         return next(e);
     }
 }
-
 async function listAssignedPurchases(req, res, next) {
   try {
     const purchases = await sessionSvc.listAssignedPurchases(req.user);
@@ -156,3 +155,31 @@ module.exports = {
     uploadIdDocument,
   listAssignedPurchases,
 };
+
+
+/* ---------- Tutor Wallet Requests ---------- */
+async function getMyWallet(req, res, next) {
+  try {
+    const svc = require('../services/wallet.service');
+    const data = await svc.getTutorWallet(req.user.id);
+    res.json(data);
+  } catch (e) { next(e); }
+}
+async function listMyWithdrawals(req, res, next) {
+  try {
+    const { limit, offset } = req.query || {};
+    const svc = require('../services/wallet.service');
+    const rows = await svc.listMyWithdrawRequests(req.user.id, { limit, offset });
+    res.json({ items: rows });
+  } catch (e) { next(e); }
+}
+async function createWithdrawRequest(req, res, next) {
+  try {
+    const { amount, method, note } = req.body || {};
+    const svc = require('../services/wallet.service');
+    const data = await svc.createWithdrawRequest(req.user.id, { amount, method, note });
+    res.json({ success: true, ...data });
+  } catch (e) { next(e); }
+}
+
+module.exports = { ...module.exports, getMyWallet, listMyWithdrawals, createWithdrawRequest };
