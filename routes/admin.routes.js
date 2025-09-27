@@ -2,7 +2,6 @@
 const router = require("express").Router();
 
 const ctrl = require("../controllers/admin.controller");
-const admin = require("../controllers/admin.controller");
 const { validate } = require("../middlewares/validate.middleware");
 const { authMiddleware } = require("../middlewares/auth.middleware");
 const { requireRole } = require("../middlewares/role.middleware");
@@ -108,11 +107,11 @@ router.delete(
 /* ---------- Sessions (SessionType) ---------- */
 router.get("/sessions", ensureCtrl("listSessions"));
 router.get("/sessions/count", ensureCtrl("countSessions")); // counts
-router.post("/sessions", safeValidate(adminSchema.createSession), ensureCtrl("createSession")); // ✅ schema key
+router.post("/sessions", safeValidate(adminSchema.createSession), ensureCtrl("createSession"));
 router.put(
   "/sessions/:id",
   safeValidate(adminSchema.idParam, "params"),
-  safeValidate(adminSchema.updateSession), // ✅ schema key
+  safeValidate(adminSchema.updateSession),
   ensureCtrl("updateSession")
 );
 router.delete(
@@ -175,25 +174,6 @@ router.get(
   ensureCtrl("listFeedback")
 );
 
-/* ---------- Manual Payments ---------- */
-router.get(
-  "/payments",
-  safeValidate(paymentSchema?.adminListQuery, "query"),
-  ensureCtrl("listManualPayments")
-);
-router.patch(
-  "/payments/:transactionId/approve",
-  safeValidate(paymentSchema?.adminDecisionParams, "params"),
-  safeValidate(paymentSchema?.adminDecisionBody, "body"),
-  ensureCtrl("approveManualPayment")
-);
-router.patch(
-  "/payments/:transactionId/reject",
-  safeValidate(paymentSchema?.adminDecisionParams, "params"),
-  safeValidate(paymentSchema?.adminDecisionBody, "body"),
-  ensureCtrl("rejectManualPayment")
-);
-
 /* ---------- Reports ---------- */
 router.get(
   "/reports/consumption",
@@ -208,11 +188,8 @@ router.get(
 
 /* ---------- Users & Purchases (Assignments support) ---------- */
 router.get("/users/count", ensureCtrl("countUsers"));
-router.get("/users", admin.listUsers);
-
-// NEW: deep detail for Admin drawer
+router.get("/users", ensureCtrl("listUsers"));
 router.get("/users/:id", ensureCtrl("getUser"));
-
 router.get(
   "/students/:id/purchases",
   safeValidate(adminSchema.idParam, "params"),
@@ -245,18 +222,10 @@ router.patch(
   ensureCtrl("assignTutorRank")
 );
 
-
+/* ---------- Tutor ID Verification ---------- */
+// List review queue (default pending|approved|rejected)
+router.get("/tutor-id-requests", ensureCtrl("listTutorIdRequests"));
+// Approve/Reject a specific tutor's ID document
+router.patch("/tutors/:id/id-document", ensureCtrl("reviewTutorIdDocument"));
 
 module.exports = router;
-
-
-/* ---------- Tutor Wallet ---------- */
-router.get('/tutors/:id/wallet', ensureCtrl('getTutorWallet'));
-router.post('/tutors/:id/wallet/withdraw', ensureCtrl('withdrawTutorWallet'));
-
-
-
-// Wallet withdraw requests
-router.get('/withdrawals', ensureCtrl('listWithdrawRequests'));
-router.post('/withdrawals/:id/paid', ensureCtrl('markWithdrawPaid'));
-router.post('/withdrawals/:id/cancel', ensureCtrl('cancelWithdrawRequest'));

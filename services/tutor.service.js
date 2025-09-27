@@ -3,7 +3,7 @@ const {
   sequelize, User, TutorProfile, TutorRank, Language, Subject, BacType,
   Assignment, StudentProfile, SessionType, Bundle, CalendarEvent
 } = require('../models');
-const {Op} = require("sequelize");
+const { Op } = require("sequelize");
 
 const includeTree = [
   { model: TutorRank, as: 'rank' },
@@ -38,16 +38,28 @@ async function upsertMe(userId, payload) {
   return sequelize.transaction(async (t) => {
     let profile = await TutorProfile.findOne({ where: { userId }, transaction: t });
 
+    const baseUpdate = {
+      fullName, phone, dob, address, educationLevel, availabilityHoursPerWeek,
+      tutoringType, payoutMethod, rankId, profilePictureUrl, preferredGradesText
+    };
+
+    // If ID doc provided (create or update), set to pending for admin review
+    if (idDocumentUrl) {
+      baseUpdate.idDocumentUrl = idDocumentUrl;
+      baseUpdate.idDocumentStatus = 'pending';
+      baseUpdate.idDocumentReviewedBy = null;
+      baseUpdate.idDocumentReviewedAt = null;
+      baseUpdate.idDocumentNotes = null;
+    }
+
     if (!profile) {
-      profile = await TutorProfile.create({
-        userId, fullName, phone, dob, address, educationLevel, availabilityHoursPerWeek,
-        tutoringType, payoutMethod, rankId, idDocumentUrl, profilePictureUrl, preferredGradesText
-      }, { transaction: t });
+      profile = await TutorProfile.create(
+        { userId, ...baseUpdate, idDocumentUrl: idDocumentUrl || null },
+        { transaction: t }
+      );
+      // If tutor created without idDocumentUrl, keep default status (pending or leave as is)
     } else {
-      await profile.update({
-        fullName, phone, dob, address, educationLevel, availabilityHoursPerWeek,
-        tutoringType, payoutMethod, rankId, idDocumentUrl, profilePictureUrl, preferredGradesText
-      }, { transaction: t });
+      await profile.update(baseUpdate, { transaction: t });
     }
 
     const langs = languageIds.length ? await Language.findAll({ where: { id: languageIds }, transaction: t }) : [];

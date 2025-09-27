@@ -390,6 +390,32 @@ const assignTutorRank = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+/* ---------------- Tutor ID verification ---------------- */
+const listTutorIdRequests = async (req, res) => {
+  try {
+    const status = (req.query?.status || "pending").toLowerCase();
+    const allowed = ["pending", "approved", "rejected"];
+    const safe = allowed.includes(status) ? status : "pending";
+    const rows = await admin.listTutorIdRequests(safe);
+    res.json({ requests: rows });
+  } catch (err) {
+    console.error("Admin listTutorIdRequests failed:", err);
+    res.status(500).json({ error: { code: "SERVER_ERROR", message: err.message || "Failed to list ID requests" } });
+  }
+};
+
+const reviewTutorIdDocument = async (req, res) => {
+  try {
+    const { id: tutorUserId } = req.params;
+    const { status, notes } = req.body || {};
+    const row = await admin.reviewTutorIdDocument(req.user.id, tutorUserId, { status, notes });
+    res.json({ review: row, message: `ID document ${status}` });
+  } catch (err) {
+    const code = err.status || 500;
+    res.status(code).json({ error: { code: "REVIEW_FAILED", message: err.message || "Failed to review ID document" } });
+  }
+};
+
 /* ----------------------- Exports ------------------------ */
 module.exports = {
   // lookups
@@ -423,7 +449,7 @@ module.exports = {
   countUsers, countSessions, updateUser, deleteUser,
 
   // ranks
-  getTutorRankUsage, assignTutorRank,
+  getTutorRankUsage, assignTutorRank,listTutorIdRequests, reviewTutorIdDocument
 };
 
 

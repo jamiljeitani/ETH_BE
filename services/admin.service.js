@@ -15,7 +15,6 @@ const {
 } = require("../models");
 
 /* ------------ include builders (use real aliases from models/index.js) ------------ */
-// Students
 function buildStudentInclude() {
   return [
     {
@@ -42,7 +41,6 @@ function buildStudentInclude() {
   ];
 }
 
-// Tutors
 function buildTutorInclude() {
   return [
     {
@@ -58,6 +56,11 @@ function buildTutorInclude() {
         "availabilityHoursPerWeek",
         "preferredGradesText",
         "rankId",
+        "idDocumentUrl",
+        "idDocumentStatus",
+        "idDocumentReviewedBy",
+        "idDocumentReviewedAt",
+        "idDocumentNotes",
         "createdAt",
       ],
       include: [
@@ -76,7 +79,7 @@ async function listUsers({ role }) {
   const include =
     role === "tutor" ? buildTutorInclude()
     : role === "student" ? buildStudentInclude()
-    : []; // admins: no deep include by default
+    : [];
 
   return User.findAll({
     where,
@@ -86,7 +89,51 @@ async function listUsers({ role }) {
   });
 }
 
-/* ------------------------------ simple CRUD ------------------------------ */
+/* ------------------------------ Tutor ID review ------------------------------ */
+async function listTutorIdRequests(status = "pending") {
+  const where = {};
+  if (status) where.idDocumentStatus = status;
+
+  const tutors = await TutorProfile.findAll({
+    where,
+    include: [
+      { model: User, as: "user", attributes: ["id", "email", "role"] },
+      { model: TutorRank, as: "rank", attributes: ["id", "name", "order"] },
+      { model: Language, as: "languages", attributes: ["id", "name"], through: { attributes: [] } },
+      { model: Subject, as: "subjects", attributes: ["id", "name"], through: { attributes: [] } },
+      { model: BacType, as: "bacTypes", attributes: ["id", "name"], through: { attributes: [] } },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  return tutors;
+}
+
+async function reviewTutorIdDocument(adminUserId, tutorUserId, { status, notes }) {
+  if (!["approved", "rejected"].includes(status)) {
+    const e = new Error("Invalid status; must be 'approved' or 'rejected'");
+    e.status = 400; throw e;
+  }
+
+  const profile = await TutorProfile.findOne({ where: { userId: tutorUserId } });
+  if (!profile) { const e = new Error("Tutor profile not found"); e.status = 404; throw e; }
+
+  await profile.update({
+    idDocumentStatus: status,
+    idDocumentReviewedBy: adminUserId,
+    idDocumentReviewedAt: new Date(),
+    idDocumentNotes: notes || null,
+  });
+
+  return TutorProfile.findByPk(profile.id, {
+    include: [
+      { model: User, as: "user", attributes: ["id", "email"] },
+      { model: TutorRank, as: "rank", attributes: ["id", "name", "order"] },
+    ],
+  });
+}
+
+/* ------------------------------ simple CRUD (unchanged) ------------------------------ */
 function crudSimple(Model, orderField = "name") {
   return {
     list: () => Model.findAll({ order: [[orderField, "ASC"]] }),
@@ -166,15 +213,22 @@ async function removeBundle(id) {
 }
 
 module.exports = {
+  // simple CRUD groups
   language,
   subject,
   grade,
   bacType,
   tutorRank,
   sessionType,
+
+  // users & bundles
   listUsers,
   listBundles,
   createBundle,
   updateBundle,
   removeBundle,
+
+  // ✅ Tutor ID verification (the missing exports)
+  listTutorIdRequests,
+  reviewTutorIdDocument,
 };

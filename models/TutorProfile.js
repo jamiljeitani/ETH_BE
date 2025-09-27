@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     userId: { type: DataTypes.UUID, allowNull: false, unique: true },
 
     fullName: { type: DataTypes.STRING, allowNull: false },
-    phone: { type: DataTypes.STRING, allowNull: true }, 
+    phone: { type: DataTypes.STRING, allowNull: true },
     dob: { type: DataTypes.DATEONLY, allowNull: false },
     address: { type: DataTypes.STRING, allowNull: false },
 
@@ -18,6 +18,16 @@ module.exports = (sequelize, DataTypes) => {
     rankId: { type: DataTypes.UUID, allowNull: true }, // TutorRank
     idDocumentUrl: { type: DataTypes.STRING, allowNull: false },
     profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
+
+    // NEW — ID verification workflow
+    idDocumentStatus: {
+      type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+      allowNull: false,
+      defaultValue: 'pending'
+    },
+    idDocumentReviewedBy: { type: DataTypes.UUID, allowNull: true },
+    idDocumentReviewedAt: { type: DataTypes.DATE, allowNull: true },
+    idDocumentNotes: { type: DataTypes.TEXT, allowNull: true },
 
     // Wallet balance (accumulates approved/pending earnings)
     walletAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
