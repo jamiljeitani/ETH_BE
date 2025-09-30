@@ -80,35 +80,33 @@ async function listEvents(user, query = {}) {
     if (studentId) where.studentId = studentId;
     if (tutorId) where.tutorId = tutorId;
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-return _rows.map(ev => {
-  const p = ev.purchase;
-  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-  // Attach virtuals for FE convenience
-  const data = ev.toJSON();
-  data.sessionsRemaining = sessionsRemaining;
-  if (!data.title && sessionsRemaining != null) {
-    data.title = `Session • rem: ${sessionsRemaining}`;
-  }
-  return data;
-});
+    return _rows.map(ev => {
+      const p = ev.purchase;
+      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+      const data = ev.toJSON();
+      data.sessionsRemaining = sessionsRemaining;
+      if (!data.title && sessionsRemaining != null) {
+        data.title = `Session • rem: ${sessionsRemaining}`;
+      }
+      return data;
+    });
   }
 
   if (user.role === 'student') {
     where.studentId = user.id;
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-return _rows.map(ev => {
-  const p = ev.purchase;
-  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-  // Attach virtuals for FE convenience
-  const data = ev.toJSON();
-  data.sessionsRemaining = sessionsRemaining;
-  if (!data.title && sessionsRemaining != null) {
-    data.title = `Session • rem: ${sessionsRemaining}`;
-  }
-  return data;
-});
+    return _rows.map(ev => {
+      const p = ev.purchase;
+      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+      const data = ev.toJSON();
+      data.sessionsRemaining = sessionsRemaining;
+      if (!data.title && sessionsRemaining != null) {
+        data.title = `Session • rem: ${sessionsRemaining}`;
+      }
+      return data;
+    });
   }
 
   // tutor: show
@@ -129,18 +127,17 @@ return _rows.map(ev => {
     };
 
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-return _rows.map(ev => {
-  const p = ev.purchase;
-  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-  // Attach virtuals for FE convenience
-  const data = ev.toJSON();
-  data.sessionsRemaining = sessionsRemaining;
-  if (!data.title && sessionsRemaining != null) {
-    data.title = `Session • rem: ${sessionsRemaining}`;
-  }
-  return data;
-});
+    return _rows.map(ev => {
+      const p = ev.purchase;
+      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+      const data = ev.toJSON();
+      data.sessionsRemaining = sessionsRemaining;
+      if (!data.title && sessionsRemaining != null) {
+        data.title = `Session • rem: ${sessionsRemaining}`;
+      }
+      return data;
+    });
   }
 
   // fallback: nothing
@@ -162,6 +159,10 @@ async function createEvent(creator, body) {
     subjectId,
     purchaseId,
   } = body || {};
+
+  // normalize meeting link (accept both keys)
+  const meetingUrlRaw = (body?.meetingUrl || body?.meetingLink || '').trim();
+  const meetingUrl = meetingUrlRaw || null;
 
   // derive sides
   let { studentId, tutorId } = body || {};
@@ -196,6 +197,7 @@ async function createEvent(creator, body) {
     endAt,
     locationType: locationType || null,
     locationDetails: locationDetails || null,
+    meetingUrl, // ⬅️ store optional meeting link
     subjectId: subjectId || null,
     purchaseId: purchaseId || null,
     studentId: studentId || null,
@@ -296,15 +298,18 @@ async function cancelEvent(user, id, reason) {
   return ev;
 }
 
-async function rescheduleEvent(user, id, { startAt, endAt, note }) {
+async function rescheduleEvent(user, id, { startAt, endAt, note, meetingUrl: mUrlRaw, meetingLink: mLinkRaw }) {
   const prev = await CalendarEvent.findByPk(id);
   if (!prev) { const e = new Error('Event not found'); e.status = 404; throw e; }
   if (!isParticipant(user, prev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
 
+  // normalize updated meeting url (if provided); otherwise keep previous value
+  const normalizedMeetingUrl = (mUrlRaw || mLinkRaw || '').trim() || prev.meetingUrl || null;
+
   // mark the old one as 'rescheduled'
   await prev.update({ status: 'rescheduled' });
 
-  // create a new 'proposed' session with same participants
+  // create a new 'proposed' session with same participants (carry over/override meetingUrl)
   const next = await CalendarEvent.create({
     title: prev.title,
     description: note || prev.description || null,
@@ -314,6 +319,7 @@ async function rescheduleEvent(user, id, { startAt, endAt, note }) {
     endAt,
     locationType: prev.locationType,
     locationDetails: prev.locationDetails,
+    meetingUrl: normalizedMeetingUrl,
     subjectId: prev.subjectId,
     purchaseId: prev.purchaseId,
     studentId: prev.studentId,
@@ -336,120 +342,117 @@ async function rescheduleEvent(user, id, { startAt, endAt, note }) {
   return next;
 }
 
+// ------------------------------------------------------------------
+// (unchanged) createRecurringEvents
+// ------------------------------------------------------------------
 async function createRecurringEvents(user, body) {
-    const {
-        title, description, subjectId, purchaseId,
-        startAt, durationMinutes, count,
-        studentId: studentIdFromTutor // tutor only
-    } = body;
+  const {
+    title, description, subjectId, purchaseId,
+    startAt, durationMinutes, count,
+    studentId: studentIdFromTutor // tutor only
+  } = body;
 
-    // Figure out who the "student" is
-    let studentId = user.id;
-    if (user.role === 'tutor') {
-        if (!studentIdFromTutor) {
-            const e = new Error('studentId is required when tutor creates a series.');
-            e.status = 400; throw e;
-        }
-        studentId = studentIdFromTutor;
-    } else if (user.role !== 'student' && user.role !== 'admin') {
-        const e = new Error('Not allowed.');
-        e.status = 403; throw e;
+  let studentId = user.id;
+  if (user.role === 'tutor') {
+    if (!studentIdFromTutor) {
+      const e = new Error('studentId is required when tutor creates a series.');
+      e.status = 400; throw e;
     }
+    studentId = studentIdFromTutor;
+  } else if (user.role !== 'student' && user.role !== 'admin') {
+    const e = new Error('Not allowed.');
+    e.status = 403; throw e;
+  }
 
-    // Validate purchase belongs to that student
-    const purchase = await Purchase.findByPk(purchaseId);
-    if (!purchase || purchase.studentId !== studentId) {
-        const e = new Error('Invalid purchaseId for the selected student.');
-        e.status = 400; throw e;
+  const purchase = await Purchase.findByPk(purchaseId);
+  if (!purchase || purchase.studentId !== studentId) {
+    const e = new Error('Invalid purchaseId for the selected student.');
+    e.status = 400; throw e;
+  }
+
+  const assignment = await Assignment.findOne({ where: { purchaseId } });
+  if (!assignment) { const e = new Error('Purchase is not assigned to a tutor.'); e.status = 400; throw e; }
+
+  const tutorId = assignment.tutorId;
+  if (user.role === 'tutor' && user.id !== tutorId) {
+    const e = new Error('This purchase is not assigned to you.');
+    e.status = 403; throw e;
+  }
+
+  const totalNeededMinutes = durationMinutes * count;
+  const purchasedMin = Number(purchase.sessionsPurchased || 0) * 60;
+  const consumedMin  = Number(purchase.sessionsConsumed  || 0) * 60;
+  const remainingMin = Math.max(0, purchasedMin - consumedMin);
+  if (remainingMin < durationMinutes) {
+    const e = new Error('Not enough remaining minutes to start a series.');
+    e.status = 400; throw e;
+  }
+
+  const maxOccurrences = Math.floor(remainingMin / durationMinutes);
+  const futureBooked = await CalendarEvent.count({
+    where: {
+      purchaseId,
+      type: 'session',
+      status: { [Op.in]: ['proposed','accepted'] },
+      startAt: { [Op.gte]: new Date() },
     }
+  });
+  const availableOccurrences = Math.max(0, maxOccurrences - futureBooked);
+  if (count > availableOccurrences) {
+    const e = new Error(`Not enough remaining sessions. Requested ${count}, available ${availableOccurrences}.`);
+    e.status = 400; throw e;
+  }
 
-    // Validate assignment connects this purchase to the tutor (or admin bypass)
-    const assignment = await Assignment.findOne({ where: { purchaseId } });
-    if (!assignment) { const e = new Error('Purchase is not assigned to a tutor.'); e.status = 400; throw e; }
+  const firstStart = dayjs(startAt);
+  const eventsToCreate = [];
+  for (let i = 0; i < count; i++) {
+    const s = firstStart.add(i, 'week');
+    const e = s.add(durationMinutes, 'minute');
+    eventsToCreate.push({ startAt: s.toDate(), endAt: e.toDate() });
+  }
 
-    const tutorId = assignment.tutorId;
-    if (user.role === 'tutor' && user.id !== tutorId) {
-        const e = new Error('This purchase is not assigned to you.');
-        e.status = 403; throw e;
-    }
+  async function hasOverlap(s, e, t) {
+    const where = {
+      [Op.or]: [
+        { tutorId,   status: { [Op.in]: ['proposed','accepted'] } },
+        { studentId, status: { [Op.in]: ['proposed','accepted'] } },
+      ],
+      startAt: { [Op.lt]: e },
+      endAt:   { [Op.gt]: s },
+    };
+    const cnt = await CalendarEvent.count({ where, transaction: t });
+    return cnt > 0;
+  }
 
-    // Simple affordability (optional)
-    const totalNeededMinutes = durationMinutes * count;
-    const purchasedMin = Number(purchase.sessionsPurchased || 0) * 60;
-    const consumedMin  = Number(purchase.sessionsConsumed  || 0) * 60;
-    const remainingMin = Math.max(0, purchasedMin - consumedMin);
-    if (remainingMin < durationMinutes) {
-        const e = new Error('Not enough remaining minutes to start a series.');
-        e.status = 400; throw e;
-    }
+  return await sequelize.transaction(async (t) => {
+    const created = [];
+    for (const occ of eventsToCreate) {
+      const overlap = await hasOverlap(occ.startAt, occ.endAt, t);
+      if (overlap) continue;
 
-    // Enforce that requested count does not exceed remaining capacity
-    const maxOccurrences = Math.floor(remainingMin / durationMinutes);
-    // Optionally subtract already-booked future events for this purchase
-    const futureBooked = await CalendarEvent.count({
-      where: {
-        purchaseId,
+      const ev = await CalendarEvent.create({
+        title: title || 'Session',
+        description: description || null,
         type: 'session',
-        status: { [Op.in]: ['proposed','accepted'] },
-        startAt: { [Op.gte]: new Date() },
-      }
-    });
-    const availableOccurrences = Math.max(0, maxOccurrences - futureBooked);
-    if (count > availableOccurrences) {
-        const e = new Error(`Not enough remaining sessions. Requested ${count}, available ${availableOccurrences}.`);
-        e.status = 400; throw e;
+        status: (user.role === 'tutor') ? 'accepted' : 'proposed',
+        startAt: occ.startAt,
+        endAt: occ.endAt,
+        studentId,
+        tutorId,
+        subjectId: subjectId || null,
+        purchaseId,
+        createdBy: user.id,
+      }, { transaction: t });
+
+      created.push(ev);
     }
 
-    const firstStart = dayjs(startAt);
-    const eventsToCreate = [];
-    for (let i = 0; i < count; i++) {
-        const s = firstStart.add(i, 'week');
-        const e = s.add(durationMinutes, 'minute');
-        eventsToCreate.push({ startAt: s.toDate(), endAt: e.toDate() });
+    if (created.length === 0) {
+      const e = new Error('All occurrences conflicted with existing events.');
+      e.status = 409; throw e;
     }
-
-    async function hasOverlap(s, e, t) {
-        const where = {
-            [Op.or]: [
-                { tutorId,   status: { [Op.in]: ['proposed','accepted'] } },
-                { studentId, status: { [Op.in]: ['proposed','accepted'] } },
-            ],
-            startAt: { [Op.lt]: e },
-            endAt:   { [Op.gt]: s },
-        };
-        const cnt = await CalendarEvent.count({ where, transaction: t });
-        return cnt > 0;
-    }
-
-    return await sequelize.transaction(async (t) => {
-        const created = [];
-        for (const occ of eventsToCreate) {
-            const overlap = await hasOverlap(occ.startAt, occ.endAt, t);
-            if (overlap) continue;
-
-            const ev = await CalendarEvent.create({
-                title: title || 'Session',
-                description: description || null,
-                type: 'session',
-                status: (user.role === 'tutor') ? 'accepted' : 'proposed', // tutor books = auto-accepted
-                startAt: occ.startAt,
-                endAt: occ.endAt,
-                studentId,
-                tutorId,
-                subjectId: subjectId || null,
-                purchaseId,
-                createdBy: user.id,
-            }, { transaction: t });
-
-            created.push(ev);
-        }
-
-        if (created.length === 0) {
-            const e = new Error('All occurrences conflicted with existing events.');
-            e.status = 409; throw e;
-        }
-        return created;
-    });
+    return created;
+  });
 }
 
 module.exports = {
