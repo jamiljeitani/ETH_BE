@@ -228,4 +228,23 @@ router.get("/tutor-id-requests", ensureCtrl("listTutorIdRequests"));
 // Approve/Reject a specific tutor's ID document
 router.patch("/tutors/:id/id-document", ensureCtrl("reviewTutorIdDocument"));
 
+/* ---------- Manual Payments ---------- */
+router.get(
+    "/payments",
+    safeValidate(paymentSchema?.adminListQuery, "query"),
+    ensureCtrl("listManualPayments")
+);
+router.patch(
+    "/payments/:transactionId/approve",
+    safeValidate(paymentSchema?.adminDecisionParams, "params"),
+    safeValidate(paymentSchema?.adminDecisionBody, "body"),
+    ensureCtrl("approveManualPayment")
+);
+router.patch(
+    "/payments/:transactionId/reject",
+    safeValidate(paymentSchema?.adminDecisionParams, "params"),
+    safeValidate(paymentSchema?.adminDecisionBody, "body"),
+    ensureCtrl("rejectManualPayment")
+);
+
 module.exports = router;
