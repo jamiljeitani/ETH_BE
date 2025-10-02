@@ -49,19 +49,35 @@ const rescheduleBody = Joi.object({
   meetingLink: urlField.optional().allow(null, ''),
 }).unknown(false);
 
+// validators/calendar.js
 const createRecurring = Joi.object({
-  // one-off event template
-  title: Joi.string().allow('', null),
-  description: Joi.string().allow('', null),
-  subjectId: Joi.string().guid({ version: 'uuidv4' }).allow(null),
-  purchaseId: Joi.string().guid({ version: 'uuidv4' }).required(),
+    // one-off template
+    title: Joi.string().allow('', null),
+    description: Joi.string().allow('', null),
 
-  // recurrence inputs
-  startAt: Joi.date().iso().required(),        // first occurrence start
-  durationMinutes: Joi.number().integer().min(15).max(240).required(),
-  count: Joi.number().integer().min(1).max(30).required(),   // e.g., 5
-  // weekly by default; if you want more later, extend with 'freq', 'interval'
+    subjectId: Joi.string().guid({ version: 'uuidv4' }).allow(null),
+    purchaseId: Joi.string().guid({ version: 'uuidv4' }).required(),
+
+    // timing
+    startAt: Joi.date().iso().required(),                       // first occurrence
+    durationMinutes: Joi.number().integer().min(15).max(240).required(),
+
+    // recurrence
+    count: Joi.number().integer().min(1).max(300).required(),   // total occurrences
+    freq: Joi.string().valid('once','daily','weekly').default('weekly'),
+    backToBack: Joi.number().integer().min(1).max(24).default(1),
+
+    // parity with single-create
+    type: Joi.string().valid('session','exam','target').default('session'),
+    locationType: Joi.string().valid('online','in-person').allow(null),
+    locationDetails: Joi.string().allow('', null),
+    meetingUrl: Joi.string().uri().allow('', null),
+    meetingLink: Joi.string().uri().allow('', null),
+
+    // tutor may target a student explicitly
+    studentId: Joi.string().guid({ version: 'uuidv4' }).allow(null),
 }).unknown(false);
+
 
 module.exports = {
   idParam,
