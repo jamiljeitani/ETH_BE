@@ -22,10 +22,12 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
-    currency: { type: DataTypes.STRING, allowNull: false, defaultValue: 'USD' }
+    currency: { type: DataTypes.STRING, allowNull: false, defaultValue: 'USD' },
+    feedbackEmailsSent: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
   }, {
     tableName: 'purchases',
     indexes: [
+      { fields: ['feedbackEmailsSent'] },
       { fields: ['studentId'] },
       { fields: ['bundleId'] },
       { fields: ['sessionTypeId'] }

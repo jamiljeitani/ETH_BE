@@ -7,4 +7,5 @@ const schema = require('../validators/purchase.schema');
 router.post('/', validate(schema.createPurchase), ctrl.create);
 router.get('/', ctrl.listMine);
 
+
 module.exports = router;

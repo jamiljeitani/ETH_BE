@@ -5,5 +5,6 @@ const { validate } = require('../middlewares/validate.middleware');
 const schema = require('../validators/feedback.schema');
 
 router.post('/', validate(schema.create), ctrl.create);
+router.post('/getPurchase', ctrl.getPurchaseController);
 
 module.exports = router;

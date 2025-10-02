@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const {
   sequelize, User, Purchase, Assignment, Session, SessionTiming, Consumption, Timesheet, SessionType, StudentProfile
 } = require('../models');
+const { maybeSendCompletionFeedbackEmails } = require('./completion-feedback.service');
 
 /* ---------- utils ---------- */
 const ceilMinutes = (ms) => Math.max(0, Math.ceil(ms / 60000));
@@ -172,6 +173,9 @@ exports.end = async (tutorId, id) => sequelize.transaction(async (t) => {
         await purchase.update(updates, { transaction: t });
     }
 
+    maybeSendCompletionFeedbackEmails({ purchaseId: purchase.id, sessionId: s.id })
+        .catch(err => console.warn('Feedback email send failed:', err && err.message));
+
     // Record consumption
     await Consumption.create({
         purchaseId: purchase.id,
@@ -324,7 +328,7 @@ exports.listAssignedPurchases = async (user) => {
         let totalMin = 0;
         let consumedMin = 0;
         let minutesRemaining = 0;
-        let sessionsRemaining = 0;
+        let sessionsRemaining = 0.0000;
 
         if (isBundle) {
             // bundle_items.hours === sessionNumber
@@ -356,9 +360,16 @@ exports.listAssignedPurchases = async (user) => {
             consumedMin = consumed  * perSessionMin;
 
             minutesRemaining = Math.max(0, totalMin - consumedMin);
-            sessionsRemaining = Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed)
-                ? Math.max(0, purchased - consumed)
-                : Math.floor(minutesRemaining / perSessionMin);
+            const decDiff = (a, b, scale = 3) => {
+                const m = Math.pow(10, scale);
+                const A = Math.round(a * m);
+                const B = Math.round(b * m);
+                return (A - B) / m;
+            };
+
+            sessionsRemaining = Number.isFinite(purchased) && Number.isFinite(consumed)
+                ? Math.max(0, decDiff(purchased, consumed, 3)) // 20 - 19.800 = 0.2
+                : (perSessionMin > 0 ? Math.floor(minutesRemaining / perSessionMin) : 0);
         }
 
         const displayName = p.bundle?.name
