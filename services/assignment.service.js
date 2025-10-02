@@ -187,8 +187,8 @@ async function listAssignments(filters = {}) {
       hours: a.purchase?.hours,
       status: a.purchase?.status,
       displayName: a.purchase?.bundleId
-        ? `${a.purchase?.bundle?.name || 'Bundle'} (${a.purchase?.hours}h)`
-        : `${a.purchase?.sessionType?.name || 'Session'} (${a.purchase?.hours}h)`,
+        ? `${a.purchase?.bundle?.name || 'Bundle'} (${a.purchase?.sessionsPurchased})`
+        : `${a.purchase?.sessionType?.name || 'Session'} (${a.purchase?.sessionsPurchased})`,
     },
   }));
 }
