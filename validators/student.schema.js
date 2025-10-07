@@ -13,7 +13,7 @@ const putMe = Joi.object({
   languageIds: Joi.array().items(Joi.string().uuid()).min(1).required(),
   subjectIds: Joi.array().items(Joi.string().uuid()).min(1).required(),
   bacTypeIds: Joi.array().items(Joi.string().uuid()).min(1).required(),
-  profilePictureUrl: Joi.string().uri().required(),
+  profilePictureUrl: Joi.string().uri().allow('', null),
   notes: Joi.string().allow('', null)
 });
 

@@ -14,7 +14,7 @@ const putMe = Joi.object({
   // rankId: Joi.string().uuid().required(),
   // commented for testing
   idDocumentUrl: Joi.string().uri().required(),
-  profilePictureUrl: Joi.string().uri().required(),
+  profilePictureUrl: Joi.string().uri().allow('', null),
   preferredGradesText: Joi.string().max(200).allow('', null),
 
   languageIds: Joi.array().items(Joi.string().uuid()).min(1).required(),

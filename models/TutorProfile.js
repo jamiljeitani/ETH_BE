@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
 
     rankId: { type: DataTypes.UUID, allowNull: true }, // TutorRank
     idDocumentUrl: { type: DataTypes.STRING, allowNull: false },
-    profilePictureUrl: { type: DataTypes.STRING, allowNull: false },
+    profilePictureUrl: { type: DataTypes.STRING, allowNull: true },
 
     // NEW — ID verification workflow
     idDocumentStatus: {
