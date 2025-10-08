@@ -17,12 +17,13 @@ async function getMe(userId) {
   if (!user) { const e = new Error('User not found'); e.status = 404; throw e; }
 
   const withProfile = await User.findByPk(userId, {
-    include: [{ model: TutorProfile, as: 'tutorProfile', required: true, include: includeTree }]
+    include: [{ model: TutorProfile, as: 'tutorProfile', required: false, include: includeTree }]
   });
 
-  if (!withProfile) {
-    const e = new Error('Tutor profile not found for this user');
+  if (!withProfile || !withProfile.tutorProfile) {
+    const e = new Error('Tutor profile not found. Please complete your profile setup.');
     e.status = 404;
+    e.code = 'PROFILE_NOT_FOUND';
     throw e;
   }
   return withProfile.tutorProfile;
