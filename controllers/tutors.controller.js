@@ -182,4 +182,13 @@ async function createWithdrawRequest(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { ...module.exports, getMyWallet, listMyWithdrawals, createWithdrawRequest };
+async function getMyWalletTransactions(req, res, next) {
+  try {
+    const { limit, offset } = req.query || {};
+    const svc = require('../services/wallet.service');
+    const rows = await svc.getUserWalletTransactions(req.user.id, { limit, offset });
+    res.json({ items: rows });
+  } catch (e) { next(e); }
+}
+
+module.exports = { ...module.exports, getMyWallet, listMyWithdrawals, createWithdrawRequest, getMyWalletTransactions };

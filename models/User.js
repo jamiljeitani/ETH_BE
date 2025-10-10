@@ -7,10 +7,14 @@ module.exports = (sequelize, DataTypes) => {
     role: { type: DataTypes.ENUM('admin', 'student', 'tutor'), allowNull: false, defaultValue: 'student' },
     status: { type: DataTypes.ENUM('active', 'disabled'), allowNull: false, defaultValue: 'active' },
     emailVerifiedAt: { type: DataTypes.DATE, allowNull: true },
-    preferredLanguage: { type: DataTypes.STRING, allowNull: true, defaultValue: 'en' }
+    preferredLanguage: { type: DataTypes.STRING, allowNull: true, defaultValue: 'en' },
+    wallet_balance: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0.00 }
   }, {
     tableName: 'users',
-    indexes: [{ fields: ['email'], unique: true }]
+    indexes: [
+      { fields: ['email'], unique: true },
+      { fields: ['wallet_balance'] }
+    ]
   });
 
   return User;

@@ -31,8 +31,13 @@ async function reject(req, res, next) {
 
 async function cancel(req, res, next) {
   try {
-    const ev = await svc.cancelEvent(req.user, req.params.id, req.body.reason);
-    res.json({ event: ev, message: 'Event cancelled.' });
+    const result = await svc.cancelEvent(req.user, req.params.id, req.body);
+    res.json({ 
+      success: true,
+      event: result.event, 
+      message: 'Event cancelled.',
+      walletOperation: result.walletOperation || null
+    });
   } catch (e) { next(e); }
 }
 

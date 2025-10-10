@@ -37,6 +37,13 @@ const createEvent = Joi.object({
 
 const reasonBody = Joi.object({
   reason: Joi.string().allow(null, '').optional(),
+  // New cancellation policy fields
+  charged: Joi.boolean().optional(),
+  hoursUntilSession: Joi.number().min(0).optional(),
+  cancelledBy: Joi.string().valid('student', 'tutor').optional(),
+  cancelledById: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).optional(),
+  sessionCost: Joi.number().min(0).optional(),
+  applyWalletPolicy: Joi.boolean().optional(),
 }).unknown(false);
 
 const rescheduleBody = Joi.object({

@@ -11,6 +11,9 @@ const {
   Assignment, // <-- used to find the student's assigned tutor
 } = require('../models');
 
+// Import wallet service for cancellation policy
+const walletService = require('./wallet.service');
+
 // If you don't have these utilities, you can stub them safely:
 let sendVerifyEmail = async () => {};
 let calendarProposedEmail = () => ({ subject: '', html: '' });
@@ -276,12 +279,45 @@ async function rejectEvent(user, id, reason) {
   return ev;
 }
 
-async function cancelEvent(user, id, reason) {
+async function cancelEvent(user, id, cancellationData) {
   const ev = await CalendarEvent.findByPk(id);
   if (!ev) { const e = new Error('Event not found'); e.status = 404; throw e; }
   if (!isParticipant(user, ev)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
 
-  await ev.update({ status: 'cancelled', cancelReason: reason || null });
+  // Extract cancellation data (support both old and new format)
+  const reason = cancellationData?.reason || cancellationData;
+  const {
+    charged = false,
+    hoursUntilSession = null,
+    cancelledBy = null,
+    cancelledById = null,
+    sessionCost = 0,
+    applyWalletPolicy = false
+  } = cancellationData || {};
+
+  // Update event status
+  await ev.update({ 
+    status: 'cancelled', 
+    cancelReason: reason || null,
+    cancelledBy: cancelledById || user.id,
+    cancelledAt: new Date()
+  });
+
+  let walletOperation = null;
+
+  // Apply wallet policy if within 6 hours
+  if (applyWalletPolicy && sessionCost > 0) {
+    try {
+      walletOperation = await applyCancellationWalletPolicy(ev, {
+        cancelledBy,
+        sessionCost,
+        cancelledById: cancelledById || user.id
+      });
+    } catch (error) {
+      console.error('Wallet operation failed during cancellation:', error);
+      // Continue with cancellation even if wallet operation fails
+    }
+  }
 
   try {
     const [student, tutor] = await Promise.all([
@@ -295,7 +331,62 @@ async function cancelEvent(user, id, reason) {
     ]);
   } catch (_) {}
 
-  return ev;
+  return { event: ev, walletOperation };
+}
+
+async function applyCancellationWalletPolicy(event, cancellationData) {
+  const { cancelledBy, sessionCost, cancelledById } = cancellationData;
+  
+  if (cancelledBy === 'student') {
+    // Student cancellation - consume session and pay tutor
+    const result = await handleStudentCancellation(event, sessionCost);
+    return result;
+  } else if (cancelledBy === 'tutor') {
+    // Tutor cancellation - deduct from tutor wallet (penalty)
+    const result = await walletService.deductFromWallet(event.tutorId, sessionCost, {
+      type: 'cancellation_penalty',
+      referenceId: event.id,
+      description: `Penalty for cancelling session within 6 hours`,
+      allowNegative: true // Tutors can have negative balance
+    });
+    
+    return {
+      applied: true,
+      type: 'penalty',
+      amount: sessionCost,
+      newBalance: result.newBalance,
+      userId: event.tutorId
+    };
+  }
+  
+  return { applied: false };
+}
+
+async function handleStudentCancellation(event, sessionCost) {
+  // 1. Consume student session (deduct from purchased sessions)
+  if (event.purchaseId) {
+    const purchase = await Purchase.findByPk(event.purchaseId);
+    if (purchase) {
+      await purchase.update({
+        sessionsConsumed: sequelize.literal(`COALESCE("sessionsConsumed", 0) + 1`)
+      });
+    }
+  }
+  
+  // 2. Pay tutor (add to tutor wallet)
+  const tutorResult = await walletService.addToWallet(event.tutorId, sessionCost, {
+    type: 'session_payment',
+    referenceId: event.id,
+    description: `Payment for session cancelled by student within 6 hours`
+  });
+  
+  return {
+    applied: true,
+    type: 'session_consumption',
+    amount: sessionCost,
+    newBalance: tutorResult.newBalance,
+    userId: event.tutorId
+  };
 }
 
 async function rescheduleEvent(user, id, { startAt, endAt, note, meetingUrl: mUrlRaw, meetingLink: mLinkRaw }) {

@@ -43,6 +43,10 @@ module.exports = (sequelize, DataTypes) => {
       // Rescheduling chain
       rescheduleOf: { type: DataTypes.UUID, allowNull: true }, // -> calendar_events.id (parent)
       decisionReason: { type: DataTypes.TEXT, allowNull: true }, // reason when rejected/cancelled/rescheduled
+      
+      // Cancellation tracking
+      cancelledBy: { type: DataTypes.UUID, allowNull: true }, // -> users.id (who cancelled)
+      cancelledAt: { type: DataTypes.DATE, allowNull: true }, // when cancelled
     },
     {
       tableName: "calendar_events",

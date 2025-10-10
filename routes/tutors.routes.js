@@ -21,6 +21,7 @@ router.get('/me/assignments', ctrl.listMyAssignments);
 
 /** Wallet */
 router.get('/me/wallet', ctrl.getMyWallet);
+router.get('/me/wallet/transactions', ctrl.getMyWalletTransactions);
 router.get('/me/withdrawals', ctrl.listMyWithdrawals);
 router.post('/me/withdrawals', ctrl.createWithdrawRequest);
 
