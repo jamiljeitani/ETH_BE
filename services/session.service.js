@@ -22,8 +22,32 @@ async function assertTutorOwnsPurchase(tutorId, purchaseId, t) {
 async function effectiveRatePerHour(purchase, t) {
   if (purchase.sessionTypeId) {
     const st = await SessionType.findByPk(purchase.sessionTypeId, { transaction: t });
+    // Use tutorRate if available, otherwise fall back to hourlyRate
+    if (st?.tutorRate != null) return Number(st.tutorRate);
+    if (st?.hourlyRate != null) return Number(st.hourlyRate);
+    // Legacy support for old 'rate' field
     if (st?.rate != null) return Number(st.rate);
   }
+  
+  // Handle bundle purchases - calculate weighted average tutor rate
+  if (purchase.bundleId && purchase.bundle?.items) {
+    let totalTutorAmount = 0;
+    let totalHours = 0;
+    
+    for (const item of purchase.bundle.items) {
+      if (item.sessionType) {
+        const tutorRate = item.sessionType.tutorRate || item.sessionType.hourlyRate || 0;
+        const hours = Number(item.hours || 0);
+        totalTutorAmount += Number(tutorRate) * hours;
+        totalHours += hours;
+      }
+    }
+    
+    if (totalHours > 0) {
+      return totalTutorAmount / totalHours;
+    }
+  }
+  
   const hours = Number(purchase.sessionsPurchased || 0);
   if (hours > 0 && purchase.amount != null) return Number(purchase.amount) / hours;
   return Number(purchase.rate || 0);

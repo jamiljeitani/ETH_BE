@@ -30,16 +30,41 @@ const updateTutorRank = Joi.object({
 const createSessionType = Joi.object({
   name: Joi.string().trim().min(2).max(150).required(),
   hourlyRate: Joi.number().precision(2).positive().required(),
+  tutorRate: Joi.number().precision(2).positive().optional().allow(null),
   sessionHours: Joi.number().integer().min(1).max(40).optional(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().optional()
+}).custom((value, helpers) => {
+  // Validate that tutorRate is less than hourlyRate if both are provided
+  if (value.tutorRate !== null && value.tutorRate !== undefined && 
+      value.hourlyRate !== null && value.hourlyRate !== undefined) {
+    if (Number(value.tutorRate) >= Number(value.hourlyRate)) {
+      return helpers.error('custom.tutorRateTooHigh');
+    }
+  }
+  return value;
+}).messages({
+  'custom.tutorRateTooHigh': 'Tutor rate must be less than hourly rate to ensure platform profit'
 });
+
 const updateSessionType = Joi.object({
   name: Joi.string().trim().min(2).max(150).optional(),
   hourlyRate: Joi.number().precision(2).positive().optional(),
+  tutorRate: Joi.number().precision(2).positive().optional().allow(null),
   sessionHours: Joi.number().integer().min(1).max(40).optional(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().optional()
+}).custom((value, helpers) => {
+  // Validate that tutorRate is less than hourlyRate if both are provided
+  if (value.tutorRate !== null && value.tutorRate !== undefined && 
+      value.hourlyRate !== null && value.hourlyRate !== undefined) {
+    if (Number(value.tutorRate) >= Number(value.hourlyRate)) {
+      return helpers.error('custom.tutorRateTooHigh');
+    }
+  }
+  return value;
+}).messages({
+  'custom.tutorRateTooHigh': 'Tutor rate must be less than hourly rate to ensure platform profit'
 });
 
 // ---- FIX: BacType (allow description) ----

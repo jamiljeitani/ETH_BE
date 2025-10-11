@@ -199,7 +199,7 @@ const listStudentPurchases = async (req, res, next) => {
     const purchases = await Purchase.findAll({
       where: { studentId },
       include: [
-        { model: SessionType, as: "sessionType", attributes: ["id", "name", "hourlyRate"] },
+        { model: SessionType, as: "sessionType", attributes: ["id", "name", "hourlyRate", "tutorRate"] },
         { model: Bundle, as: "bundle", attributes: ["id", "name"] },
         { 
           model: User, 

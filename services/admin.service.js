@@ -157,14 +157,85 @@ const subject = crudSimple(Subject);
 const grade = crudSimple(Grade);
 const bacType = crudSimple(BacType);
 const tutorRank = crudSimple(TutorRank, "order");
-const sessionType = crudSimple(SessionType);
+// Custom sessionType CRUD to handle tutorRate validation
+const sessionType = {
+  list: () => SessionType.findAll({ order: [["name", "ASC"]] }),
+  create: async (payload) => {
+    // Validate tutorRate < hourlyRate if both provided
+    if (payload.tutorRate !== null && payload.tutorRate !== undefined && 
+        payload.hourlyRate !== null && payload.hourlyRate !== undefined) {
+      if (Number(payload.tutorRate) >= Number(payload.hourlyRate)) {
+        const e = new Error('Tutor rate must be less than hourly rate to ensure platform profit');
+        e.status = 400;
+        throw e;
+      }
+    }
+    return SessionType.create(payload);
+  },
+  update: async (id, payload) => {
+    const rec = await SessionType.findByPk(id);
+    if (!rec) { const e = new Error("Not found"); e.status = 404; throw e; }
+    
+    // Get current values for validation
+    const currentHourlyRate = payload.hourlyRate !== undefined ? payload.hourlyRate : rec.hourlyRate;
+    const currentTutorRate = payload.tutorRate !== undefined ? payload.tutorRate : rec.tutorRate;
+    
+    // Validate tutorRate < hourlyRate if both provided
+    if (currentTutorRate !== null && currentTutorRate !== undefined && 
+        currentHourlyRate !== null && currentHourlyRate !== undefined) {
+      if (Number(currentTutorRate) >= Number(currentHourlyRate)) {
+        const e = new Error('Tutor rate must be less than hourly rate to ensure platform profit');
+        e.status = 400;
+        throw e;
+      }
+    }
+    
+    await rec.update(payload);
+    return rec;
+  },
+  remove: async (id) => {
+    const count = await SessionType.destroy({ where: { id } });
+    if (!count) { const e = new Error("Not found"); e.status = 404; throw e; }
+    return { deleted: true };
+  },
+};
+
+/* ------------------------------ Bundle Price Calculation ------------------------------ */
+function calculateBundlePrices(bundleItems, sessionTypes) {
+  const studentTotal = bundleItems.reduce((total, item) => {
+    const sessionType = sessionTypes.find(st => st.id === item.sessionTypeId);
+    return total + (item.hours * Number(sessionType?.hourlyRate || 0));
+  }, 0);
+
+  const tutorTotal = bundleItems.reduce((total, item) => {
+    const sessionType = sessionTypes.find(st => st.id === item.sessionTypeId);
+    const rate = sessionType?.tutorRate || sessionType?.hourlyRate || 0;
+    return total + (item.hours * Number(rate));
+  }, 0);
+
+  return {
+    studentTotal: Number(studentTotal.toFixed(2)),
+    tutorTotal: Number(tutorTotal.toFixed(2)),
+    platformProfit: Number((studentTotal - tutorTotal).toFixed(2))
+  };
+}
 
 /* ------------------------------ Bundles ------------------------------ */
-const listBundles = () =>
-  Bundle.findAll({
+const listBundles = async () => {
+  const bundles = await Bundle.findAll({
     order: [["name", "ASC"]],
     include: [{ model: BundleItem, as: "items", include: [{ model: SessionType, as: "sessionType" }] }],
   });
+  
+  // Add price calculations to each bundle
+  return bundles.map(bundle => {
+    const prices = calculateBundlePrices(bundle.items, bundle.items.map(item => item.sessionType));
+    bundle.dataValues.studentTotal = prices.studentTotal;
+    bundle.dataValues.tutorTotal = prices.tutorTotal;
+    bundle.dataValues.platformProfit = prices.platformProfit;
+    return bundle;
+  });
+};
 
 async function createBundle({ name, description, isActive = true, items }) {
   return sequelize.transaction(async (t) => {
@@ -175,10 +246,19 @@ async function createBundle({ name, description, isActive = true, items }) {
         { transaction: t }
       );
     }
-    return Bundle.findByPk(bundle.id, {
+    
+    const bundleWithItems = await Bundle.findByPk(bundle.id, {
       include: [{ model: BundleItem, as: "items", include: [{ model: SessionType, as: "sessionType" }] }],
       transaction: t,
     });
+    
+    // Calculate and add price information
+    const prices = calculateBundlePrices(bundleWithItems.items, bundleWithItems.items.map(item => item.sessionType));
+    bundleWithItems.dataValues.studentTotal = prices.studentTotal;
+    bundleWithItems.dataValues.tutorTotal = prices.tutorTotal;
+    bundleWithItems.dataValues.platformProfit = prices.platformProfit;
+    
+    return bundleWithItems;
   });
 }
 
@@ -199,10 +279,18 @@ async function updateBundle(id, { name, description, isActive, items }) {
       }
     }
 
-    return Bundle.findByPk(id, {
+    const bundleWithItems = await Bundle.findByPk(id, {
       include: [{ model: BundleItem, as: "items", include: [{ model: SessionType, as: "sessionType" }] }],
       transaction: t,
     });
+    
+    // Calculate and add price information
+    const prices = calculateBundlePrices(bundleWithItems.items, bundleWithItems.items.map(item => item.sessionType));
+    bundleWithItems.dataValues.studentTotal = prices.studentTotal;
+    bundleWithItems.dataValues.tutorTotal = prices.tutorTotal;
+    bundleWithItems.dataValues.platformProfit = prices.platformProfit;
+    
+    return bundleWithItems;
   });
 }
 
