@@ -1,7 +1,7 @@
 // services/consumption.service.js
 const { Op } = require('sequelize');
 const {
-  sequelize, Purchase, Consumption, Session, SessionType, Bundle, BundleItem
+  sequelize, Purchase, Consumption, Session, SessionType, Bundle, BundleItem, User, TutorProfile
 } = require('../models');
 
 function toInt(n) { return Math.max(0, parseInt(n, 10) || 0); }
@@ -18,6 +18,19 @@ async function listStudentPurchasesWithConsumption(studentId) {
                     { model: BundleItem, as: 'items', include: [
                             { model: SessionType, as: 'sessionType', attributes: ['id','name','sessionHours'] }
                         ] }
+                ]
+            },
+            { 
+                model: User, 
+                as: 'assignedTutor', 
+                attributes: ['id', 'email'],
+                include: [
+                    { 
+                        model: TutorProfile, 
+                        as: 'tutorProfile', 
+                        attributes: ['fullName'],
+                        required: false 
+                    }
                 ]
             }
         ],

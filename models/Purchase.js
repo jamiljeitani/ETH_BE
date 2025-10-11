@@ -23,14 +23,16 @@ module.exports = (sequelize, DataTypes) => {
 
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
     currency: { type: DataTypes.STRING, allowNull: false, defaultValue: 'USD' },
-    feedbackEmailsSent: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+    feedbackEmailsSent: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    assignedTutorId: { type: DataTypes.UUID, allowNull: true } // -> users.id
   }, {
     tableName: 'purchases',
     indexes: [
       { fields: ['feedbackEmailsSent'] },
       { fields: ['studentId'] },
       { fields: ['bundleId'] },
-      { fields: ['sessionTypeId'] }
+      { fields: ['sessionTypeId'] },
+      { fields: ['assignedTutorId'] }
     ]
   });
 

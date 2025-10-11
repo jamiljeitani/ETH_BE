@@ -201,10 +201,28 @@ const listStudentPurchases = async (req, res, next) => {
       include: [
         { model: SessionType, as: "sessionType", attributes: ["id", "name", "hourlyRate"] },
         { model: Bundle, as: "bundle", attributes: ["id", "name"] },
+        { 
+          model: User, 
+          as: 'assignedTutor', 
+          attributes: ['id', 'email'],
+          include: [
+            { 
+              model: TutorProfile, 
+              as: 'tutorProfile', 
+              attributes: ['fullName'],
+              required: false 
+            }
+          ]
+        }
       ],
       order: [["createdAt", "DESC"]],
     });
-    res.json({ purchases });
+    
+    // Transform the purchases to include assignedTutor in the correct format
+    const { transformPurchasesData } = require('../utils/purchaseTransformer');
+    const transformedPurchases = transformPurchasesData(purchases);
+    
+    res.json({ purchases: transformedPurchases });
   } catch (err) { next(err); }
 };
 

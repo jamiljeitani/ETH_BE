@@ -1,6 +1,6 @@
 // services/purchase.service.js
 const dayjs = require('dayjs');
-const { sequelize, User, Purchase, Bundle, BundleItem, SessionType } = require('../models');
+const { sequelize, User, Purchase, Bundle, BundleItem, SessionType, TutorProfile } = require('../models');
 const { isAtLeast24hLater } = require('../utils/date');
 const { purchaseConfirmationEmail } = require('../utils/emailTemplates'); // used by payment service
 const { sendVerifyEmail } = require('./email.service'); // (not used here—kept for symmetry)
@@ -65,7 +65,20 @@ async function createPurchase(studentId, payload) {
     return Purchase.findByPk(purchase.id, {
       include: [
         { model: Bundle, as: 'bundle', include: [{ model: BundleItem, as: 'items', include: [{ model: SessionType, as: 'sessionType' }] }] },
-        { model: SessionType, as: 'sessionType' }
+        { model: SessionType, as: 'sessionType' },
+        { 
+          model: User, 
+          as: 'assignedTutor', 
+          attributes: ['id', 'email'],
+          include: [
+            { 
+              model: TutorProfile, 
+              as: 'tutorProfile', 
+              attributes: ['fullName'],
+              required: false 
+            }
+          ]
+        }
       ],
       transaction: t
     });
@@ -78,7 +91,20 @@ async function listMyPurchases(studentId) {
     order: [['createdAt', 'DESC']],
     include: [
       { model: Bundle, as: 'bundle', include: [{ model: BundleItem, as: 'items', include: [{ model: SessionType, as: 'sessionType' }] }] },
-      { model: SessionType, as: 'sessionType' }
+      { model: SessionType, as: 'sessionType' },
+      { 
+        model: User, 
+        as: 'assignedTutor', 
+        attributes: ['id', 'email'],
+        include: [
+          { 
+            model: TutorProfile, 
+            as: 'tutorProfile', 
+            attributes: ['fullName'],
+            required: false 
+          }
+        ]
+      }
     ]
   });
 }

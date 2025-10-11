@@ -75,6 +75,12 @@ async function createOrReplaceAssignment(
       await assignment.update(payload, { transaction: t });
     }
 
+    // Update the Purchase.assignedTutorId field to keep it in sync
+    await Purchase.update(
+      { assignedTutorId: tutorId },
+      { where: { id: purchaseId }, transaction: t }
+    );
+
     // best-effort emails
     try {
       if (sendVerifyEmail && assignmentStudentEmail && assignmentTutorEmail) {
@@ -113,14 +119,37 @@ async function updateAssignment(adminId, id, { tutorId, notes }) {
     payload.assignedBy = adminId;
 
     await assignment.update(payload, { transaction: t });
+    
+    // Update the Purchase.assignedTutorId field to keep it in sync
+    if (tutorId) {
+      await Purchase.update(
+        { assignedTutorId: tutorId },
+        { where: { id: assignment.purchaseId }, transaction: t }
+      );
+    }
+    
     return assignment;
   });
 }
 
 async function removeAssignment(id) {
-  const count = await Assignment.destroy({ where: { id } });
-  if (!count) { const e = new Error('Assignment not found'); e.status = 404; throw e; }
-  return { deleted: true };
+  return sequelize.transaction(async (t) => {
+    const assignment = await Assignment.findByPk(id, { transaction: t });
+    if (!assignment) { const e = new Error('Assignment not found'); e.status = 404; throw e; }
+    
+    const purchaseId = assignment.purchaseId;
+    
+    // Remove the assignment
+    await Assignment.destroy({ where: { id }, transaction: t });
+    
+    // Clear the Purchase.assignedTutorId field
+    await Purchase.update(
+      { assignedTutorId: null },
+      { where: { id: purchaseId }, transaction: t }
+    );
+    
+    return { deleted: true };
+  });
 }
 
 async function listAssignments(filters = {}) {

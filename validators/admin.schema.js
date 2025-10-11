@@ -89,8 +89,31 @@ const updateAssignment = Joi.object({
 
 // Change Requests
 const decisionChangeRequest = Joi.object({
-  action: Joi.string().valid('approve', 'reject').required(),
-  resolutionNote: Joi.string().max(500).allow('', null)
+  decision: Joi.string().valid('approve', 'reject').required().messages({
+    'any.only': 'Decision must be either "approve" or "reject"',
+    'any.required': 'Decision is required'
+  }),
+  note: Joi.string().max(1000).optional().allow('').messages({
+    'string.max': 'Note cannot exceed 1000 characters'
+  }),
+  reason: Joi.string().max(1000).optional().allow('').messages({
+    'string.max': 'Reason cannot exceed 1000 characters'
+  })
+}).custom((value, helpers) => {
+  // If decision is approve, note is optional but reason should not be provided
+  if (value.decision === 'approve' && value.reason) {
+    return helpers.error('custom.approveWithReason');
+  }
+  
+  // If decision is reject, reason is optional but note should not be provided
+  if (value.decision === 'reject' && value.note) {
+    return helpers.error('custom.rejectWithNote');
+  }
+  
+  return value;
+}).messages({
+  'custom.approveWithReason': 'Cannot provide reason when approving a request',
+  'custom.rejectWithNote': 'Cannot provide note when rejecting a request'
 });
 const idParamChangeReq = Joi.object({
   id: Joi.string().uuid().required()

@@ -2,6 +2,7 @@
 const router = require("express").Router();
 
 const ctrl = require("../controllers/admin.controller");
+const changeRequestCtrl = require("../controllers/change-request.controller");
 const { validate } = require("../middlewares/validate.middleware");
 const { authMiddleware } = require("../middlewares/auth.middleware");
 const { requireRole } = require("../middlewares/role.middleware");
@@ -159,12 +160,12 @@ router.delete(
 );
 
 /* ---------- Tutor change requests ---------- */
-router.get("/tutor-change-requests", ensureCtrl("listChangeRequests"));
+router.get("/tutor-change-requests", changeRequestCtrl.listAllChangeRequests);
 router.patch(
   "/tutor-change-requests/:id",
   safeValidate(adminSchema.idParam, "params"),
   safeValidate(adminSchema.decisionChangeRequest),
-  ensureCtrl("decideChangeRequest")
+  changeRequestCtrl.handleChangeRequest
 );
 
 /* ---------- Feedback (admin-only) ---------- */

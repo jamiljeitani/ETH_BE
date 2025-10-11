@@ -117,6 +117,7 @@ db.Purchase.belongsTo(db.User, { foreignKey: 'studentId', as: 'student' });
 
 db.Purchase.belongsTo(db.Bundle, { foreignKey: 'bundleId', as: 'bundle' });
 db.Purchase.belongsTo(db.SessionType, { foreignKey: 'sessionTypeId', as: 'sessionType' });
+db.Purchase.belongsTo(db.User, { foreignKey: 'assignedTutorId', as: 'assignedTutor' });
 
 db.Purchase.hasMany(db.PaymentTransaction, { foreignKey: 'purchaseId', as: 'payments', onDelete: 'CASCADE' });
 db.PaymentTransaction.belongsTo(db.Purchase, { foreignKey: 'purchaseId', as: 'purchase' });
@@ -136,6 +137,7 @@ db.Purchase.hasMany(db.TutorChangeRequest, { foreignKey: 'purchaseId', as: 'tuto
 db.TutorChangeRequest.belongsTo(db.Purchase, { foreignKey: 'purchaseId', as: 'purchase' });
 db.User.hasMany(db.TutorChangeRequest, { foreignKey: 'studentId', as: 'tutorChangeRequests' });
 db.TutorChangeRequest.belongsTo(db.User, { foreignKey: 'studentId', as: 'student' });
+db.TutorChangeRequest.belongsTo(db.User, { foreignKey: 'currentTutorId', as: 'currentTutor' });
 db.TutorChangeRequest.belongsTo(db.User, { foreignKey: 'handledBy', as: 'handledByUser' });
 
 // Phase 6 Associations (Calendar)

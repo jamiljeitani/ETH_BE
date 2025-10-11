@@ -75,7 +75,15 @@ async function getMyConsumption(req, res, next) {
     try {
         const svc = require('../services/consumption.service');
         const data = await svc.listStudentPurchasesWithConsumption(req.user.id);
-        res.json(data);
+        
+        // Transform the data to include assignedTutor information
+        const { transformPurchasesData } = require('../utils/purchaseTransformer');
+        const transformedData = data.map(item => ({
+            ...item,
+            purchase: transformPurchasesData([item.purchase])[0]
+        }));
+        
+        res.json(transformedData);
     } catch (e) { next(e); }
 }
 
