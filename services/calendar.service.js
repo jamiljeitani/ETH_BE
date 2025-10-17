@@ -9,6 +9,9 @@ const {
   Purchase,
   CalendarEvent,
   Assignment, // <-- used to find the student's assigned tutor
+  SessionType,
+  Bundle,
+  BundleItem,
 } = require('../models');
 
 // Import wallet service for cancellation policy
@@ -62,11 +65,141 @@ function normalizeDatesFilter(from, to) {
   return where;
 }
 
+// Helper function to calculate pricing data for events
+function calculateEventPricing(purchase) {
+  if (!purchase) return null;
+
+  let hourlyRate = null;
+  let tutorRate = null;
+  let sessionType = null;
+  let bundle = null;
+
+  // Priority 1: SessionType pricing (for single session purchases)
+  if (purchase.sessionType) {
+    sessionType = {
+      id: purchase.sessionType.id,
+      name: purchase.sessionType.name,
+      hourlyRate: Number(purchase.sessionType.hourlyRate),
+      tutorRate: Number(purchase.sessionType.tutorRate || purchase.sessionType.hourlyRate),
+      sessionHours: purchase.sessionType.sessionHours,
+      description: purchase.sessionType.description
+    };
+    hourlyRate = sessionType.hourlyRate;
+    tutorRate = sessionType.tutorRate;
+  }
+
+  // Priority 2: Bundle pricing (for bundle purchases)
+  if (purchase.bundle && purchase.bundle.items && purchase.bundle.items.length > 0) {
+    // Calculate weighted average rates for bundle
+    let totalHours = 0;
+    let totalStudentAmount = 0;
+    let totalTutorAmount = 0;
+
+    purchase.bundle.items.forEach(item => {
+      if (item.sessionType) {
+        const hours = Number(item.hours || 0);
+        const studentRate = Number(item.sessionType.hourlyRate || 0);
+        const tutorRate = Number(item.sessionType.tutorRate || item.sessionType.hourlyRate || 0);
+        
+        totalHours += hours;
+        totalStudentAmount += hours * studentRate;
+        totalTutorAmount += hours * tutorRate;
+      }
+    });
+
+    if (totalHours > 0) {
+      hourlyRate = totalStudentAmount / totalHours;
+      tutorRate = totalTutorAmount / totalHours;
+    }
+
+    bundle = {
+      id: purchase.bundle.id,
+      name: purchase.bundle.name,
+      description: purchase.bundle.description,
+      hourlyRate: hourlyRate,
+      tutorRate: tutorRate,
+      items: purchase.bundle.items.map(item => ({
+        id: item.id,
+        hours: item.hours,
+        sessionType: item.sessionType ? {
+          id: item.sessionType.id,
+          name: item.sessionType.name,
+          hourlyRate: Number(item.sessionType.hourlyRate),
+          tutorRate: Number(item.sessionType.tutorRate || item.sessionType.hourlyRate),
+          sessionHours: item.sessionType.sessionHours
+        } : null
+      }))
+    };
+  }
+
+  return {
+    hourlyRate,
+    tutorRate,
+    sessionType,
+    bundle
+  };
+}
+
+// Helper function to process and enhance event data with pricing
+function processEventData(ev) {
+  const p = ev.purchase;
+  const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
+    ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
+  const data = ev.toJSON();
+  data.sessionsRemaining = sessionsRemaining;
+  if (!data.title && sessionsRemaining != null) {
+    data.title = `Session • rem: ${sessionsRemaining}`;
+  }
+  
+  // Add pricing data to the event
+  if (data.purchase) {
+    const pricing = calculateEventPricing(p);
+    if (pricing) {
+      data.purchase.hourlyRate = pricing.hourlyRate;
+      data.purchase.tutorRate = pricing.tutorRate;
+      data.purchase.sessionType = pricing.sessionType;
+      data.purchase.bundle = pricing.bundle;
+    }
+  }
+  
+  return data;
+}
+
 const includeTree = [
   { model: User, as: 'student', attributes: ['id', 'email'] },
   { model: User, as: 'tutor', attributes: ['id', 'email'] },
   { model: Subject, as: 'subject', attributes: ['id', 'name'] },
-  { model: Purchase, as: 'purchase', attributes: ['id','sessionsPurchased','sessionsConsumed'] },
+  { 
+    model: Purchase, 
+    as: 'purchase', 
+    attributes: ['id', 'sessionsPurchased', 'sessionsConsumed', 'bundleId', 'sessionTypeId'],
+    include: [
+      {
+        model: SessionType,
+        as: 'sessionType',
+        attributes: ['id', 'name', 'hourlyRate', 'tutorRate', 'sessionHours', 'description']
+      },
+      {
+        model: Bundle,
+        as: 'bundle',
+        attributes: ['id', 'name', 'description'],
+        include: [
+          {
+            model: BundleItem,
+            as: 'items',
+            attributes: ['id', 'hours'],
+            include: [
+              {
+                model: SessionType,
+                as: 'sessionType',
+                attributes: ['id', 'name', 'hourlyRate', 'tutorRate', 'sessionHours']
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
 ];
 
 // ------------------------------------------------------------------
@@ -83,33 +216,13 @@ async function listEvents(user, query = {}) {
     if (studentId) where.studentId = studentId;
     if (tutorId) where.tutorId = tutorId;
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-    return _rows.map(ev => {
-      const p = ev.purchase;
-      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-      const data = ev.toJSON();
-      data.sessionsRemaining = sessionsRemaining;
-      if (!data.title && sessionsRemaining != null) {
-        data.title = `Session • rem: ${sessionsRemaining}`;
-      }
-      return data;
-    });
+    return _rows.map(processEventData);
   }
 
   if (user.role === 'student') {
     where.studentId = user.id;
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-    return _rows.map(ev => {
-      const p = ev.purchase;
-      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-      const data = ev.toJSON();
-      data.sessionsRemaining = sessionsRemaining;
-      if (!data.title && sessionsRemaining != null) {
-        data.title = `Session • rem: ${sessionsRemaining}`;
-      }
-      return data;
-    });
+    return _rows.map(processEventData);
   }
 
   // tutor: show
@@ -130,17 +243,7 @@ async function listEvents(user, query = {}) {
     };
 
     const _rows = await CalendarEvent.findAll({ where, include: includeTree, order: [['startAt','ASC']] });
-    return _rows.map(ev => {
-      const p = ev.purchase;
-      const sessionsRemaining = (p && Number.isFinite(p.sessionsPurchased) && Number.isFinite(p.sessionsConsumed))
-        ? Math.max(0, Number(p.sessionsPurchased) - Number(p.sessionsConsumed)) : null;
-      const data = ev.toJSON();
-      data.sessionsRemaining = sessionsRemaining;
-      if (!data.title && sessionsRemaining != null) {
-        data.title = `Session • rem: ${sessionsRemaining}`;
-      }
-      return data;
-    });
+    return _rows.map(processEventData);
   }
 
   // fallback: nothing
@@ -628,5 +731,7 @@ module.exports = {
   rejectEvent,
   cancelEvent,
   rescheduleEvent,
-  createRecurringEvents
+  createRecurringEvents,
+  calculateEventPricing,
+  processEventData
 };

@@ -30,6 +30,9 @@ router.use('/feedback', authGuard, require('./feedback.routes')); // both roles 
 // Support messages
 router.use('/support', require('./support.routes'));
 
+// Email service
+router.use('/email', require('./email.routes'));
+
 router.get('/health', (req, res) => res.json({ ok: true }));
 
 module.exports = router;

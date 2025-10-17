@@ -31,6 +31,23 @@ const config = {
     from: process.env.FROM_EMAIL || 'no-reply@localhost'
   },
 
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    adminEmail: process.env.SMTP_ADMIN_EMAIL,
+    adminPassword: process.env.SMTP_ADMIN_PASSWORD,
+    scheduleEmail: process.env.SMTP_SCHEDULE_EMAIL,
+    schedulePassword: process.env.SMTP_SCHEDULE_PASSWORD,
+    supportEmail: process.env.SMTP_SUPPORT_EMAIL,
+    supportPassword: process.env.SMTP_SUPPORT_PASSWORD,
+    financeEmail: process.env.SMTP_FINANCE_EMAIL,
+    financePassword: process.env.SMTP_FINANCE_PASSWORD,
+    feedbackEmail: process.env.SMTP_FEEDBACK_EMAIL,
+    feedbackPassword: process.env.SMTP_FEEDBACK_PASSWORD,
+    noReplyEmail: process.env.NO_REPLY_EMAIL || 'no-reply@elitetutorshub.net'
+  },
+
   stripe: {
     secret: process.env.STRIPE_SECRET || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
