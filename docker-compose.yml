@@ -16,7 +16,10 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      # PRODUCTION: Simplified database setup
+      # - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      # DEV: Uncomment for local development with init script
+      # - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     # PRODUCTION: Remove port mapping to avoid conflicts
     # ports:
     #   - "5432:5432"
@@ -26,10 +29,11 @@ services:
     networks:
       - tutoring_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-tutoring}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # Node.js Backend Application
   backend:
@@ -66,8 +70,8 @@ services:
       SMTP_FEEDBACK_EMAIL: ${SMTP_FEEDBACK_EMAIL:-feedback@elitetutorshub.net}
       SMTP_FEEDBACK_PASSWORD: ${SMTP_FEEDBACK_PASSWORD:-C11U>&2On!}
       NO_REPLY_EMAIL: ${NO_REPLY_EMAIL:-no-reply@elitetutorshub.net}
-      STRIPE_SECRET: ${STRIPE_SECRET}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_SECRET: ${STRIPE_SECRET:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-https://elitetutorshub.net}
       BASE_URL: ${BASE_URL:-https://api.elitetutorshub.net}
       TIMEZONE: ${TIMEZONE:-Asia/Beirut}
