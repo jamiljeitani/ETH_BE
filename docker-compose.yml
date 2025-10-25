@@ -1,4 +1,7 @@
-version: '3.8'
+# Docker Compose configuration for Elite Tutors Hub
+# PRODUCTION: Ready for Hostinger VPS deployment
+# DEV: Uncomment version line for local development
+# version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -14,8 +17,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-    ports:
-      - "5432:5432"
+    # PRODUCTION: Remove port mapping to avoid conflicts
+    # ports:
+    #   - "5432:5432"
+    # DEV: Uncomment for local development
+    # ports:
+    #   - "5432:5432"
     networks:
       - tutoring_network
     healthcheck:
