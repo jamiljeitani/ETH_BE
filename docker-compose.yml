@@ -72,6 +72,9 @@ services:
       NO_REPLY_EMAIL: ${NO_REPLY_EMAIL:-no-reply@elitetutorshub.net}
       STRIPE_SECRET: ${STRIPE_SECRET:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      IMAGEKIT_PUBLIC_KEY: ${IMAGEKIT_PUBLIC_KEY:-}
+      IMAGEKIT_PRIVATE_KEY: ${IMAGEKIT_PRIVATE_KEY:-}
+      IMAGEKIT_URL_ENDPOINT: ${IMAGEKIT_URL_ENDPOINT:-}
       FRONTEND_URL: ${FRONTEND_URL:-https://elitetutorshub.net}
       BASE_URL: ${BASE_URL:-https://api.elitetutorshub.net}
       TIMEZONE: ${TIMEZONE:-Asia/Beirut}
