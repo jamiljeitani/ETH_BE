@@ -72,6 +72,12 @@ async function uploadAvatar(req, res, next) {
         const roleTag = (req.user && req.user.role) ? String(req.user.role) : 'user';
 
         // Upload: return URL only, no DB mutations here
+        if (!imagekit) {
+            return res.status(503).json({ 
+                error: { message: 'Image upload service not configured. Please contact support.' } 
+            });
+        }
+
         const uploadResp = await imagekit.upload({
             // Node SDK accepts Buffer; base64 is also fine:
             file: file.buffer, // or: file.buffer.toString('base64')
@@ -121,6 +127,12 @@ async function uploadIdDocument(req, res, next) {
         const roleTag = (req.user && req.user.role) ? String(req.user.role) : 'user';
 
         // Upload to ImageKit: return URL only, no DB write here
+        if (!imagekit) {
+            return res.status(503).json({ 
+                error: { message: 'Image upload service not configured. Please contact support.' } 
+            });
+        }
+
         const uploadResp = await imagekit.upload({
             file: file.buffer,              // Buffer is fine; base64 string also works
             fileName: filename,

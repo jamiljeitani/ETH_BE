@@ -45,6 +45,12 @@ async function uploadAvatarOnlyUrl (req, res, next)  {
         const folder = `/avatars/${req.user.id}`;
 
         // ImageKit (or your existing storage)
+        if (!imagekit) {
+            return res.status(503).json({ 
+                error: { message: 'Image upload service not configured. Please contact support.' } 
+            });
+        }
+
         const upload = await imagekit.upload({
             file: file.buffer.toString('base64'),
             fileName,
