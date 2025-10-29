@@ -117,11 +117,25 @@ services:
     volumes:
       # PRODUCTION: Mount Nginx configuration for API reverse proxy
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_ssl:/etc/nginx/ssl
       - nginx_logs:/var/log/nginx
     networks:
       - tutoring_network
     depends_on:
       - backend
+    entrypoint: >
+      sh -c "
+      if [ ! -f /etc/nginx/ssl/cert.pem ] || [ ! -f /etc/nginx/ssl/key.pem ]; then
+        apk add --no-cache openssl &&
+        mkdir -p /etc/nginx/ssl &&
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 
+          -keyout /etc/nginx/ssl/key.pem 
+          -out /etc/nginx/ssl/cert.pem 
+          -subj '/C=US/ST=State/L=City/O=Elite Tutors Hub/CN=srv1080793.hstgr.cloud' &&
+        echo 'Self-signed SSL certificate generated successfully!'
+      fi &&
+      nginx -g 'daemon off;'
+      "
     # PRODUCTION: Simplified health check for Nginx
     # healthcheck:
     #   test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/v1/health"]
@@ -133,6 +147,8 @@ volumes:
   postgres_data:
     driver: local
   uploads_data:
+    driver: local
+  nginx_ssl:
     driver: local
   nginx_logs:
     driver: local
