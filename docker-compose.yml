@@ -110,7 +110,6 @@ services:
       retries: 5
       start_period: 60s
 
-  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: tutoring_nginx
@@ -119,24 +118,17 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # PRODUCTION: Mount Nginx configuration for API reverse proxy
+      # Nginx configs and logs
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - nginx_ssl:/etc/nginx/ssl
       - nginx_logs:/var/log/nginx
+
+      # Mount real SSL certificates (from Certbot on host)
+      - /etc/letsencrypt/live/api.elitetutorshub.net/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/api.elitetutorshub.net/privkey.pem:/etc/ssl/private/privkey.pem:ro
     networks:
       - tutoring_network
     depends_on:
       - backend
-    entrypoint: >
-      sh -c "
-      if [ ! -f /etc/nginx/ssl/cert.pem ] || [ ! -f /etc/nginx/ssl/key.pem ]; then
-        apk add --no-cache openssl &&
-        mkdir -p /etc/nginx/ssl &&
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/key.pem -out /etc/nginx/ssl/cert.pem -subj '/C=US/ST=State/L=City/O=Elite Tutors Hub/CN=srv1080793.hstgr.cloud' &&
-        echo 'Self-signed SSL certificate generated successfully!'
-      fi &&
-      nginx -g 'daemon off;'
-      "
     # PRODUCTION: Simplified health check for Nginx
     # healthcheck:
     #   test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/v1/health"]
