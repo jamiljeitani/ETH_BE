@@ -15,7 +15,7 @@ const { stripeWebhook } = require('./controllers/payments.controller');
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+// app.use(cors());
 app.use(morgan('dev'));
 
 // Stripe webhook needs the raw body, so mount this BEFORE express.json()
