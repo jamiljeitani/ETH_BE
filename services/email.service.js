@@ -2,10 +2,21 @@
 const { getTransport } = require('../config/mailer');
 const cfg = require('../config/env');
 
-async function safeSend(to, subject, html) {
+async function safeSend(to, subject, html, options = {}) {
   try {
     const tx = getTransport();
-    return await tx.sendMail({ to, from: cfg.mail.from, subject, html });
+    const mailOptions = {
+      to,
+      from: cfg.mail.from,
+      subject,
+      html,
+      ...options
+    };
+    // Add Reply-To if not-reply email is configured and not already set
+    if (cfg.smtp.noReplyEmail && !mailOptions.replyTo) {
+      mailOptions.replyTo = cfg.smtp.noReplyEmail;
+    }
+    return await tx.sendMail(mailOptions);
   } catch (err) {
     console.warn('[MAIL WARNING]', err && err.message);
     if (process.env.NODE_ENV !== 'production') {
