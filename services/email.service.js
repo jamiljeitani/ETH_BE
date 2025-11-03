@@ -12,6 +12,13 @@ async function safeSend(to, subject, html, options = {}) {
       html,
       ...options
     };
+    // Ensure SMTP envelope and sender align with authenticated account (Hostinger requirement)
+    const authenticatedFrom = cfg.mail.user || mailOptions.from;
+    mailOptions.sender = authenticatedFrom;
+    mailOptions.envelope = {
+      from: authenticatedFrom,
+      to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]
+    };
     // Add Reply-To if not-reply email is configured and not already set
     if (cfg.smtp.noReplyEmail && !mailOptions.replyTo) {
       mailOptions.replyTo = cfg.smtp.noReplyEmail;
