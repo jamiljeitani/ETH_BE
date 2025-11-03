@@ -118,13 +118,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # Nginx configs and logs
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
-
-      # Mount real SSL certificates (from Certbot on host)
-      - /etc/letsencrypt/live/api.elitetutorshub.net/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
-      - /etc/letsencrypt/live/api.elitetutorshub.net/privkey.pem:/etc/ssl/private/privkey.pem:ro
     networks:
       - tutoring_network
     depends_on:
