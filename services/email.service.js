@@ -7,7 +7,7 @@ async function safeSend(to, subject, html, options = {}) {
     const tx = getTransport();
     const mailOptions = {
       to,
-      from: cfg.mail.from,
+      from: cfg.mail.user || cfg.mail.from,
       subject,
       html,
       ...options
