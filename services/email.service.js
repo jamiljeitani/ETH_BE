@@ -5,27 +5,37 @@ const cfg = require('../config/env');
 async function safeSend(to, subject, html, options = {}) {
   try {
     const tx = getTransport();
+    const authenticatedFrom = cfg.mail.user;
+
     const mailOptions = {
       to,
-      from: cfg.mail.user || cfg.mail.from,
+      from: `Elite Tutors Hub <${authenticatedFrom}>`,  // ✅ Fixed here
       subject,
       html,
-      ...options
+      ...options,
+      sender: authenticatedFrom,
+      envelope: {
+        from: authenticatedFrom,
+        to: Array.isArray(to) ? to : [to]
+      }
     };
-    // Ensure SMTP envelope and sender align with authenticated account (Hostinger requirement)
-    const authenticatedFrom = cfg.mail.user || mailOptions.from;
-    mailOptions.sender = authenticatedFrom;
-    mailOptions.envelope = {
-      from: authenticatedFrom,
-      to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]
-    };
-    // Add Reply-To if not-reply email is configured and not already set
+
     if (cfg.smtp.noReplyEmail && !mailOptions.replyTo) {
       mailOptions.replyTo = cfg.smtp.noReplyEmail;
     }
-    return await tx.sendMail(mailOptions);
+
+    const result = await tx.sendMail(mailOptions);
+
+    console.log('📧 Email sent successfully:', {
+      to: mailOptions.to,
+      from: mailOptions.from,
+      subject: mailOptions.subject,
+      messageId: result.messageId
+    });
+
+    return result;
   } catch (err) {
-    console.warn('[MAIL WARNING]', err && err.message);
+    console.warn('[MAIL WARNING]', err?.message);
     if (process.env.NODE_ENV !== 'production') {
       console.log('[DEV EMAIL FALLBACK] To:', to);
       console.log('[DEV EMAIL FALLBACK] Subject:', subject);
@@ -35,6 +45,7 @@ async function safeSend(to, subject, html, options = {}) {
     throw err;
   }
 }
+
 
 async function sendVerifyEmail(to, subject, html) {
   return safeSend(to, subject, html);
