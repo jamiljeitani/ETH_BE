@@ -96,18 +96,36 @@ async function getMyConsumption(req, res, next) {
     const svc = require("../services/consumption.service");
     const data = await svc.listStudentPurchasesWithConsumption(req.user.id);
 
-    // Ensure data is always an array
-    const purchases = Array.isArray(data) ? data : data ? [data] : [];
+    console.log("🧾 [getMyConsumption] Raw service data type:", typeof data);
+    console.log(
+      "🧾 [getMyConsumption] Raw service data preview:",
+      JSON.stringify(data, null, 2).slice(0, 500)
+    );
+
+    // Defensive normalization
+    let purchases = [];
+    if (Array.isArray(data)) {
+      purchases = data;
+    } else if (data && typeof data === "object") {
+      // Sometimes service returns { purchases: [...] } or a single record
+      if (Array.isArray(data.purchases)) purchases = data.purchases;
+      else purchases = [data];
+    } else {
+      purchases = [];
+    }
 
     const { transformPurchasesData } = require("../utils/purchaseTransformer");
+
     const transformedData = purchases.map((item) => ({
       ...item,
-      purchase: transformPurchasesData([item.purchase || {}])[0],
+      purchase: transformPurchasesData(
+        Array.isArray(item.purchase) ? item.purchase : [item.purchase || {}]
+      )[0],
     }));
 
     res.json(transformedData);
   } catch (e) {
-    console.error("getMyConsumption error:", e);
+    console.error("🔥 [getMyConsumption] ERROR:", e);
     next(e);
   }
 }
