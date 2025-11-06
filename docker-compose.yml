@@ -10,7 +10,7 @@ services:
     container_name: tutoring_postgres
     restart: unless-stopped
     env_file:
-      - production.env  # PRODUCTION: Use production environment file
+      - production.env # PRODUCTION: Use production environment file
       # - .env  # DEV: Uncomment for development
     environment:
       POSTGRES_DB: ${DB_NAME:-tutoring}
@@ -44,7 +44,7 @@ services:
     container_name: tutoring_backend
     restart: unless-stopped
     env_file:
-      - production.env  # PRODUCTION: Use production environment file
+      - production.env # PRODUCTION: Use production environment file
       # - .env  # DEV: Uncomment for development
     environment:
       # PRODUCTION: Production environment variables
@@ -54,7 +54,7 @@ services:
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-tutoring}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASS: ${DB_PASS:-EliteTutors2024!SecureDB}  # Reads from production.env
+      DB_PASS: ${DB_PASS:-EliteTutors2024!SecureDB} # Reads from production.env
       JWT_SECRET: ${JWT_SECRET:-EliteTutors2024!JWTSecretKeyForProductionUseOnly}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       REFRESH_SECRET: ${REFRESH_SECRET:-EliteTutors2024!RefreshSecretKeyForProductionUseOnly}
@@ -81,7 +81,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-https://elitetutorshub.net}
       BASE_URL: ${BASE_URL:-https://srv1080793.hstgr.cloud}
       TIMEZONE: ${TIMEZONE:-Asia/Beirut}
-      
+
       # DEV: Uncomment for development environment
       # NODE_ENV: development
       # DB_HOST: localhost
@@ -98,6 +98,8 @@ services:
     #   - "4000:4000"
     volumes:
       - uploads_data:/app/uploads
+      - .:/app
+      - /app/node_modules
     networks:
       - tutoring_network
     depends_on:
